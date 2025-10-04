@@ -140,10 +140,24 @@
                 background: #f7fafc;
                 margin: 0 auto;
             }
-            #editorCanvas {
+            .editor-controls {
+                text-align: center;
+                margin-bottom: 10px;
+            }
+            .editor-controls button {
+                padding: 5px 10px;
+                margin: 0 5px;
+                background: #e2e8f0;
+                border: 1px solid #cbd5e0;
                 border-radius: 3px;
-                max-width: 100%;
-                max-height: 100%;
+                cursor: pointer;
+            }
+            .editor-controls button:hover {
+                background: #cbd5e0;
+            }
+            #zoomLevel {
+                font-weight: bold;
+                color: #4a5568;
             }
         </style>
     </head>
@@ -169,7 +183,13 @@
             </div>
             <div id="editorSection" style="display: none;">
                 <h3>Adjust QR Code Position</h3>
-                <p>Drag the corner handles to align with the QR code corners. Adjust dimensions to see the grid overlay.</p>
+                <p>Drag the corner handles to align with the QR code corners. Adjust dimensions to see the grid overlay. Use zoom controls or mouse wheel to zoom in/out.</p>
+                <div class="editor-controls">
+                    <button id="zoomInBtn">+</button>
+                    <button id="zoomOutBtn">-</button>
+                    <button id="resetZoomBtn">Reset Zoom</button>
+                    <span id="zoomLevel">Zoom: 100%</span>
+                </div>
                 <div class="canvas-wrapper">
                     <canvas id="editorCanvas"></canvas>
                 </div>
