@@ -27,13 +27,32 @@ class Spinner {
 
 function fileUploaded() {
     const files = uploader.files;
-    if (files === null)
+    if (files === null || files.length === 0)
         return;
+
+    const file = files[0];
+    createImageBitmap(file).then(bitmap => {
+        currentBitmap = bitmap;
+        convertBtn.disabled = false;
+        statusDiv.textContent = "Image loaded. Click 'Convert QR Code' to process.";
+    }).catch((err: any) => {
+        console.error(err);
+        statusDiv.textContent = "Error loading image.";
+    });
+}
+
+function convertImage() {
+    if (!currentBitmap) {
+        statusDiv.textContent = "Please upload an image first.";
+        return;
+    }
 
     const spinner = new Spinner(statusDiv);
     spinner.start();
-    const file = files[0];
-    createImageBitmap(file).then(processFile).then(res => spinner.stop()).catch((err: any) => console.error(err));
+    processFile(currentBitmap).then(() => spinner.stop()).catch((err: any) => {
+        console.error(err);
+        spinner.stop();
+    });
 }
 
 function processFile(bitmap: ImageBitmap) {
