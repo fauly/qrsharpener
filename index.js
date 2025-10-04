@@ -18,14 +18,19 @@ let corners = [];
 let draggedCorner = null;
 let scaleX = 1;
 let scaleY = 1;
+let zoom = 1;
+let panX = 0;
+let panY = 0;
+let isPanning = false;
+let lastPanX = 0;
+let lastPanY = 0;
 
 uploader.addEventListener("change", fileUploaded, false);
 convertBtn.addEventListener("click", convertImage, false);
-dimensionsEdit.addEventListener("input", updateGrid, false);
-editorCanvas.addEventListener("mousedown", startDrag, false);
-editorCanvas.addEventListener("mousemove", drag, false);
-editorCanvas.addEventListener("mouseup", endDrag, false);
-editorCanvas.addEventListener("mouseleave", endDrag, false);
+zoomInBtn.addEventListener("click", () => zoomCanvas(1.2));
+zoomOutBtn.addEventListener("click", () => zoomCanvas(0.8));
+resetZoomBtn.addEventListener("click", resetZoom);
+editorCanvas.addEventListener("wheel", handleWheel, { passive: false });
 
 class Spinner {
     constructor(target) {
@@ -62,6 +67,12 @@ function showEditor(bitmap) {
     editorCanvas.width = bitmap.width;
     editorCanvas.height = bitmap.height;
     
+    // Reset zoom and pan for new image
+    zoom = 1;
+    panX = 0;
+    panY = 0;
+    updateZoomDisplay();
+    
     // Calculate scale factors based on displayed size vs actual size
     const rect = editorCanvas.getBoundingClientRect();
     scaleX = bitmap.width / rect.width;
@@ -84,6 +95,15 @@ function showEditor(bitmap) {
 function updateGrid() {
     if (!currentBitmap) return;
     const ctx = editorCanvas.getContext("2d");
+    
+    // Clear and reset transform
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, editorCanvas.width, editorCanvas.height);
+    
+    // Apply zoom and pan
+    ctx.translate(panX, panY);
+    ctx.scale(zoom, zoom);
+    
     ctx.drawImage(currentBitmap, 0, 0);
 
     const dimensions = parseInt(dimensionsEdit.value);
@@ -91,7 +111,7 @@ function updateGrid() {
 
     // Draw grid
     ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
-    ctx.lineWidth = 1;
+    ctx.lineWidth = 1 / zoom; // Adjust line width for zoom
 
     const minX = Math.min(...corners.map(c => c.x));
     const maxX = Math.max(...corners.map(c => c.x));
@@ -115,22 +135,24 @@ function updateGrid() {
         ctx.stroke();
     }
 
-    // Draw corner handles
+    // Draw corner handles (adjust size for zoom)
     ctx.fillStyle = "red";
+    const handleSize = 8 / zoom;
     corners.forEach(corner => {
         ctx.beginPath();
-        ctx.arc(corner.x, corner.y, 8, 0, 2 * Math.PI);
+        ctx.arc(corner.x, corner.y, handleSize, 0, 2 * Math.PI);
         ctx.fill();
     });
 }
 
 function startDrag(e) {
     const rect = editorCanvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const x = ((e.clientX - rect.left) - panX) / zoom;
+    const y = ((e.clientY - rect.top) - panY) / zoom;
 
     corners.forEach((corner, index) => {
-        if (Math.abs(corner.x - x) < 10 * scaleX && Math.abs(corner.y - y) < 10 * scaleY) {
+        const handleSize = 10 / zoom;
+        if (Math.abs(corner.x - x) < handleSize && Math.abs(corner.y - y) < handleSize) {
             draggedCorner = index;
         }
     });
@@ -140,8 +162,8 @@ function drag(e) {
     if (draggedCorner === null) return;
 
     const rect = editorCanvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
+    const x = ((e.clientX - rect.left) - panX) / zoom;
+    const y = ((e.clientY - rect.top) - panY) / zoom;
 
     corners[draggedCorner].x = Math.max(0, Math.min(editorCanvas.width, x));
     corners[draggedCorner].y = Math.max(0, Math.min(editorCanvas.height, y));
@@ -149,8 +171,33 @@ function drag(e) {
     updateGrid();
 }
 
-function endDrag() {
-    draggedCorner = null;
+function zoomCanvas(factor) {
+    const centerX = editorCanvas.width / 2;
+    const centerY = editorCanvas.height / 2;
+    
+    zoom *= factor;
+    zoom = Math.max(0.1, Math.min(5, zoom)); // Limit zoom between 0.1x and 5x
+    
+    updateZoomDisplay();
+    updateGrid();
+}
+
+function resetZoom() {
+    zoom = 1;
+    panX = 0;
+    panY = 0;
+    updateZoomDisplay();
+    updateGrid();
+}
+
+function handleWheel(e) {
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 0.9 : 1.1;
+    zoomCanvas(factor);
+}
+
+function updateZoomDisplay() {
+    zoomLevel.textContent = `Zoom: ${Math.round(zoom * 100)}%`;
 }
 
 async function convertImage() {
