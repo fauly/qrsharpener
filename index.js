@@ -157,7 +157,7 @@ function updateGrid() {
 
     // Draw corner handles (adjust size for zoom)
     ctx.fillStyle = "red";
-    const handleSize = 8 / zoom;
+    const handleSize = Math.max(8, 15 / zoom); // Minimum 8 pixels in image space
     corners.forEach(corner => {
         ctx.beginPath();
         ctx.arc(corner.x, corner.y, handleSize, 0, 2 * Math.PI);
@@ -179,8 +179,10 @@ function startDrag(e) {
 
     let foundCorner = false;
     corners.forEach((corner, index) => {
-        const handleSize = 10 / zoom;
-        if (Math.abs(corner.x - imageX) < handleSize && Math.abs(corner.y - imageY) < handleSize) {
+        const handleSize = Math.max(15, 20 / zoom); // Minimum 15 pixels, scales with zoom
+        const distX = Math.abs(corner.x - imageX);
+        const distY = Math.abs(corner.y - imageY);
+        if (distX < handleSize && distY < handleSize) {
             draggedCorner = index;
             foundCorner = true;
         }
