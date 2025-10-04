@@ -448,7 +448,7 @@ function updatePreview() {
     const imageData = tempCtx.getImageData(0, 0, currentBitmap.width, currentBitmap.height);
     
     // Generate QR using perspective-correct sampling
-    const sharpener = new QRSharpener(validDimensions, 50);
+    const sharpener = new QRSharpener(validDimensions, parseInt(threshold.value));
     const result = sharpener.sharpen(imageData, corners);
     
     // Display on preview canvas
