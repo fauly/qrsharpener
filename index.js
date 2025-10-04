@@ -14,6 +14,8 @@ const resultCanvas = document.createElement("canvas");
 let currentBitmap = null;
 let corners = [];
 let draggedCorner = null;
+let scaleX = 1;
+let scaleY = 1;
 
 uploader.addEventListener("change", fileUploaded, false);
 convertBtn.addEventListener("click", convertImage, false);
@@ -57,6 +59,12 @@ function showEditor(bitmap) {
     editorSection.style.display = "block";
     editorCanvas.width = bitmap.width;
     editorCanvas.height = bitmap.height;
+    
+    // Calculate scale factors for mouse coordinate conversion
+    const containerRect = editorCanvas.parentElement.getBoundingClientRect();
+    scaleX = bitmap.width / containerRect.width;
+    scaleY = bitmap.height / containerRect.height;
+    
     const ctx = editorCanvas.getContext("2d");
     ctx.drawImage(bitmap, 0, 0);
 
