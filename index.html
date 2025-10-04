@@ -166,13 +166,15 @@
                     <label for="uploader">File:</label>
                     <input id="uploader" type="file" accept="image/*" />
                 </div>
-                <button id="convertBtn" disabled>Convert QR Code</button>
             </div>
             <div id="editorSection" style="display: none;">
                 <h3>Adjust QR Code Position</h3>
                 <p>Drag the corner handles to align with the QR code corners. Adjust dimensions to see the grid overlay.</p>
                 <div class="canvas-wrapper">
                     <canvas id="editorCanvas"></canvas>
+                </div>
+                <div style="text-align: center; margin-top: 20px;">
+                    <button id="convertBtn" disabled>Convert QR Code</button>
                 </div>
             </div>
             <div id="status" class="status"></div>
