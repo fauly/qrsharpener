@@ -2,6 +2,7 @@ import { QRSharpener } from "./QRSharpener.js";
 
 const annotatedImage = document.getElementById("annotatedImage");
 const resultImage = document.getElementById("resultImage");
+const croppedImage = document.getElementById("croppedImage");
 const uploader = document.getElementById("uploader");
 const convertBtn = document.getElementById("convertBtn");
 const statusDiv = document.getElementById("status");
@@ -509,6 +510,22 @@ function processFile(bitmap, dimensions, corners) {
 
     const sharpener = new QRSharpener(dimensions, 50);
     const result = sharpener.sharpen(data, corners);
+
+    // Create cropped image for display
+    const minX = Math.min(...corners.map(c => c.x));
+    const maxX = Math.max(...corners.map(c => c.x));
+    const minY = Math.min(...corners.map(c => c.y));
+    const maxY = Math.max(...corners.map(c => c.y));
+
+    const cropWidth = Math.max(1, maxX - minX);
+    const cropHeight = Math.max(1, maxY - minY);
+
+    const cropCanvas = document.createElement("canvas");
+    cropCanvas.width = cropWidth;
+    cropCanvas.height = cropHeight;
+    const cropCtx = cropCanvas.getContext("2d");
+    cropCtx.drawImage(bitmap, minX, minY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    croppedImage.src = cropCanvas.toDataURL();
 
     const resultImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), dimensions, dimensions);
     const annotatedImageData = new ImageData(Uint8ClampedArray.from(result.annotatedImageBuffer), bitmap.width, bitmap.height);
