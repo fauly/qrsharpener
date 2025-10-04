@@ -28,6 +28,19 @@ let isPanning = false;
 let lastPanX = 0;
 let lastPanY = 0;
 
+// Debounce function for input fields
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
 uploader.addEventListener("change", fileUploaded, false);
 convertBtn.addEventListener("click", convertImage, false);
 dimensionsEdit.addEventListener("input", updateGrid, false);
