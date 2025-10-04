@@ -1,5 +1,4 @@
 import { QRSharpener } from "./QRSharpener";
-import { create } from "domain";
 
 const annotatedImage = document.getElementById("annotatedImage") as HTMLImageElement;
 const resultImage = document.getElementById("resultImage") as HTMLImageElement;
@@ -50,7 +49,7 @@ function processFile(bitmap: ImageBitmap) {
     const sharpener = new QRSharpener(dimensions, 50);
     const result = sharpener.sharpen(data);
 
-    const resultImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), 29, 29);
+    const resultImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), dimensions, dimensions);
     const annotatedImageData = new ImageData(Uint8ClampedArray.from(result.annotatedImageBuffer), bitmap.width, bitmap.height);
 
     renderResult(annotatedImageData, annotatedImage);
