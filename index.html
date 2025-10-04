@@ -103,18 +103,30 @@
                 flex: 1;
                 min-width: 300px;
                 text-align: center;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
             }
             .image-container h3 {
                 color: #4a5568;
                 margin-bottom: 10px;
             }
-            img {
-                image-rendering: pixelated;
-                max-width: 100%;
-                height: auto;
+            .image-wrapper {
+                width: 300px;
+                height: 300px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
                 border: 2px solid #e2e8f0;
                 border-radius: 5px;
                 box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                background: #f7fafc;
+            }
+            img {
+                image-rendering: pixelated;
+                max-width: 100%;
+                max-height: 100%;
+                border-radius: 3px;
             }
             @media (max-width: 768px) {
                 .container {
