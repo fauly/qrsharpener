@@ -36,6 +36,12 @@ zoomOutBtn.addEventListener("click", () => zoomCanvas(0.8));
 resetZoomBtn.addEventListener("click", resetZoom);
 editorCanvas.addEventListener("wheel", handleWheel, { passive: false });
 
+// Add mouse event listeners for dragging
+editorCanvas.addEventListener("mousedown", startDrag);
+editorCanvas.addEventListener("mousemove", drag);
+editorCanvas.addEventListener("mouseup", () => { draggedCorner = null; isPanning = false; });
+editorCanvas.addEventListener("mouseleave", () => { draggedCorner = null; isPanning = false; });
+
 class Spinner {
     constructor(target) {
         this.target = target;
