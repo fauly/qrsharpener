@@ -516,7 +516,7 @@ function processFile(bitmap, dimensions, corners) {
     context.drawImage(bitmap, 0, 0);
     const data = context.getImageData(0, 0, bitmap.width, bitmap.height);
 
-    const sharpener = new QRSharpener(dimensions, 50);
+    const sharpener = new QRSharpener(dimensions, parseInt(threshold.value));
     const result = sharpener.sharpen(data, corners);
 
     // Create cropped image for display
