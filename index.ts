@@ -49,10 +49,14 @@ function convertImage() {
 
     const spinner = new Spinner(statusDiv);
     spinner.start();
-    processFile(currentBitmap).then(() => spinner.stop()).catch((err: any) => {
+    try {
+        processFile(currentBitmap);
+        statusDiv.textContent = "Processing complete.";
+    } catch (err: any) {
         console.error(err);
-        spinner.stop();
-    });
+        statusDiv.textContent = "Error processing image.";
+    }
+    spinner.stop();
 }
 
 function processFile(bitmap: ImageBitmap) {
