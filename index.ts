@@ -3,12 +3,16 @@ import { QRSharpener } from "./QRSharpener";
 const annotatedImage = document.getElementById("annotatedImage") as HTMLImageElement;
 const resultImage = document.getElementById("resultImage") as HTMLImageElement;
 const uploader = document.getElementById("uploader") as HTMLInputElement;
+const convertBtn = document.getElementById("convertBtn") as HTMLButtonElement;
 const statusDiv = document.getElementById("status") as HTMLDivElement;
 const dimensionsEdit = document.getElementById("dimensions") as HTMLInputElement;
 const canvas = document.createElement("canvas");
 const resultCanvas = document.createElement("canvas");
 
+let currentBitmap: ImageBitmap | null = null;
+
 uploader.addEventListener("change", fileUploaded, false);
+convertBtn.addEventListener("click", convertImage, false);
 
 class Spinner {
     constructor(public readonly target: HTMLDivElement) {}
