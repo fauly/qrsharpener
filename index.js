@@ -52,9 +52,12 @@ editorCanvas.addEventListener("wheel", handleWheel, { passive: false });
 
 // Add mouse event listeners for dragging
 editorCanvas.addEventListener("mousedown", startDrag);
-editorCanvas.addEventListener("mousemove", drag);
+editorCanvas.addEventListener("mousemove", (e) => {
+    checkHover(e);
+    drag(e);
+});
 editorCanvas.addEventListener("mouseup", () => { draggedCorner = null; isPanning = false; });
-editorCanvas.addEventListener("mouseleave", () => { draggedCorner = null; isPanning = false; });
+editorCanvas.addEventListener("mouseleave", () => { draggedCorner = null; isPanning = false; hoveredCorner = null; updateGrid(); });
 
 class Spinner {
     constructor(target) {
