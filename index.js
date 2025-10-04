@@ -64,19 +64,33 @@ function fileUploaded() {
 
 function showEditor(bitmap) {
     editorSection.style.display = "block";
-    editorCanvas.width = bitmap.width;
-    editorCanvas.height = bitmap.height;
+    
+    // Set canvas to fixed display size
+    const canvasRect = editorCanvas.parentElement.getBoundingClientRect();
+    editorCanvas.width = canvasRect.width;
+    editorCanvas.height = canvasRect.height;
+    
+    // Calculate scale to fit image in canvas
+    const scaleX = canvasRect.width / bitmap.width;
+    const scaleY = canvasRect.height / bitmap.height;
+    const scale = Math.min(scaleX, scaleY);
     
     // Reset zoom and pan for new image
-    zoom = 1;
+    zoom = scale;
     panX = 0;
     panY = 0;
+    
+    // Center the image
+    const scaledWidth = bitmap.width * scale;
+    const scaledHeight = bitmap.height * scale;
+    panX = (canvasRect.width - scaledWidth) / 2;
+    panY = (canvasRect.height - scaledHeight) / 2;
+    
     updateZoomDisplay();
     
     // Calculate scale factors based on displayed size vs actual size
-    const rect = editorCanvas.getBoundingClientRect();
-    scaleX = bitmap.width / rect.width;
-    scaleY = bitmap.height / rect.height;
+    scaleX = bitmap.width / canvasRect.width;
+    scaleY = bitmap.height / canvasRect.height;
     
     const ctx = editorCanvas.getContext("2d");
     ctx.drawImage(bitmap, 0, 0);
