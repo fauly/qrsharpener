@@ -150,13 +150,17 @@ function updateGrid() {
 
 function startDrag(e) {
     const rect = editorCanvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) - panX) / zoom;
-    const y = ((e.clientY - rect.top) - panY) / zoom;
+    const canvasX = e.clientX - rect.left;
+    const canvasY = e.clientY - rect.top;
+    
+    // Convert to image coordinates
+    const imageX = (canvasX - panX) / zoom;
+    const imageY = (canvasY - panY) / zoom;
 
     let foundCorner = false;
     corners.forEach((corner, index) => {
         const handleSize = 10 / zoom;
-        if (Math.abs(corner.x - x) < handleSize && Math.abs(corner.y - y) < handleSize) {
+        if (Math.abs(corner.x - imageX) < handleSize && Math.abs(corner.y - imageY) < handleSize) {
             draggedCorner = index;
             foundCorner = true;
         }
@@ -173,11 +177,15 @@ function startDrag(e) {
 function drag(e) {
     if (draggedCorner !== null) {
         const rect = editorCanvas.getBoundingClientRect();
-        const x = ((e.clientX - rect.left) - panX) / zoom;
-        const y = ((e.clientY - rect.top) - panY) / zoom;
+        const canvasX = e.clientX - rect.left;
+        const canvasY = e.clientY - rect.top;
+        
+        // Convert to image coordinates
+        const imageX = (canvasX - panX) / zoom;
+        const imageY = (canvasY - panY) / zoom;
 
-        corners[draggedCorner].x = Math.max(0, Math.min(editorCanvas.width, x));
-        corners[draggedCorner].y = Math.max(0, Math.min(editorCanvas.height, y));
+        corners[draggedCorner].x = Math.max(0, Math.min(currentBitmap.width, imageX));
+        corners[draggedCorner].y = Math.max(0, Math.min(currentBitmap.height, imageY));
 
         updateGrid();
     } else if (isPanning) {
