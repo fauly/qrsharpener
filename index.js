@@ -156,28 +156,24 @@ function updateGrid() {
     ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
     ctx.lineWidth = 1 / zoom;
 
-    // Sort corners for consistent ordering: top-left, top-right, bottom-right, bottom-left
-    const sortedCorners = [...corners].sort((a, b) => {
-        if (Math.abs(a.y - b.y) < 10) return a.x - b.x; // Same row, sort by x
-        return a.y - b.y; // Different rows, sort by y
-    });
+    // Use corners in logical order: [top-left, top-right, bottom-right, bottom-left]
+    // This assumes the user maintains reasonable corner positioning
+    const topLeft = corners[0];
+    const topRight = corners[1];
+    const bottomRight = corners[2];
+    const bottomLeft = corners[3];
 
     for (let i = 0; i <= validDimensions; i++) {
         const t = i / validDimensions;
 
         // Draw vertical grid lines (interpolated between left and right edges)
-        const leftTop = sortedCorners[0];    // top-left
-        const leftBottom = sortedCorners[3]; // bottom-left
-        const rightTop = sortedCorners[1];   // top-right
-        const rightBottom = sortedCorners[2]; // bottom-right
+        // Left edge: interpolate between top-left and bottom-left
+        const leftX = topLeft.x + t * (bottomLeft.x - topLeft.x);
+        const leftY = topLeft.y + t * (bottomLeft.y - topLeft.y);
 
-        // Interpolate left edge
-        const leftX = leftTop.x + t * (leftBottom.x - leftTop.x);
-        const leftY = leftTop.y + t * (leftBottom.y - leftTop.y);
-
-        // Interpolate right edge
-        const rightX = rightTop.x + t * (rightBottom.x - rightTop.x);
-        const rightY = rightTop.y + t * (rightBottom.y - rightTop.y);
+        // Right edge: interpolate between top-right and bottom-right
+        const rightX = topRight.x + t * (bottomRight.x - topRight.x);
+        const rightY = topRight.y + t * (bottomRight.y - topRight.y);
 
         ctx.beginPath();
         ctx.moveTo(leftX, leftY);
@@ -185,16 +181,11 @@ function updateGrid() {
         ctx.stroke();
 
         // Draw horizontal grid lines (interpolated between top and bottom edges)
-        const topLeft = sortedCorners[0];     // top-left
-        const topRight = sortedCorners[1];    // top-right
-        const bottomLeft = sortedCorners[3];  // bottom-left
-        const bottomRight = sortedCorners[2]; // bottom-right
-
-        // Interpolate top edge
+        // Top edge: interpolate between top-left and top-right
         const topX = topLeft.x + t * (topRight.x - topLeft.x);
         const topY = topLeft.y + t * (topRight.y - topLeft.y);
 
-        // Interpolate bottom edge
+        // Bottom edge: interpolate between bottom-left and bottom-right
         const bottomX = bottomLeft.x + t * (bottomRight.x - bottomLeft.x);
         const bottomY = bottomLeft.y + t * (bottomRight.y - bottomLeft.y);
 
@@ -439,27 +430,17 @@ function updatePreview() {
     
     if (validDimensions <= 0) return;
     
-    // Create cropped image data based on corners
-    const minX = Math.min(...corners.map(c => c.x));
-    const maxX = Math.max(...corners.map(c => c.x));
-    const minY = Math.min(...corners.map(c => c.y));
-    const maxY = Math.max(...corners.map(c => c.y));
-    
-    const cropWidth = Math.max(1, maxX - minX);
-    const cropHeight = Math.max(1, maxY - minY);
-    
-    // Create temporary canvas for cropping
+    // Get image data from the full bitmap (not cropped)
     const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = cropWidth;
-    tempCanvas.height = cropHeight;
+    tempCanvas.width = currentBitmap.width;
+    tempCanvas.height = currentBitmap.height;
     const tempCtx = tempCanvas.getContext("2d");
-    tempCtx.drawImage(currentBitmap, minX, minY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    tempCtx.drawImage(currentBitmap, 0, 0);
+    const imageData = tempCtx.getImageData(0, 0, currentBitmap.width, currentBitmap.height);
     
-    const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
-    
-    // Generate QR using the same algorithm
+    // Generate QR using perspective-correct sampling
     const sharpener = new QRSharpener(validDimensions, 50);
-    const result = sharpener.sharpen(imageData);
+    const result = sharpener.sharpen(imageData, corners);
     
     // Display on preview canvas
     const previewCtx = previewCanvas.getContext("2d");
@@ -487,9 +468,8 @@ async function convertImage() {
     const spinner = new Spinner(statusDiv);
     spinner.start();
     try {
-        // Create cropped bitmap based on corners
-        const croppedBitmap = await cropToRectangle(currentBitmap, corners);
-        processFile(croppedBitmap, validDimensions);
+        // Process using perspective correction from the original bitmap
+        processFile(currentBitmap, validDimensions, corners);
         statusDiv.textContent = "Processing complete.";
     } catch (err) {
         console.error(err);
@@ -515,7 +495,7 @@ async function cropToRectangle(bitmap, corners) {
     return createImageBitmap(canvas);
 }
 
-function processFile(bitmap, dimensions) {
+function processFile(bitmap, dimensions, corners) {
 
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
@@ -528,7 +508,7 @@ function processFile(bitmap, dimensions) {
     const data = context.getImageData(0, 0, bitmap.width, bitmap.height);
 
     const sharpener = new QRSharpener(dimensions, 50);
-    const result = sharpener.sharpen(data);
+    const result = sharpener.sharpen(data, corners);
 
     const resultImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), dimensions, dimensions);
     const annotatedImageData = new ImageData(Uint8ClampedArray.from(result.annotatedImageBuffer), bitmap.width, bitmap.height);
