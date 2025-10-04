@@ -6,13 +6,22 @@ const uploader = document.getElementById("uploader") as HTMLInputElement;
 const convertBtn = document.getElementById("convertBtn") as HTMLButtonElement;
 const statusDiv = document.getElementById("status") as HTMLDivElement;
 const dimensionsEdit = document.getElementById("dimensions") as HTMLInputElement;
+const editorSection = document.getElementById("editorSection") as HTMLDivElement;
+const editorCanvas = document.getElementById("editorCanvas") as HTMLCanvasElement;
 const canvas = document.createElement("canvas");
 const resultCanvas = document.createElement("canvas");
 
 let currentBitmap: ImageBitmap | null = null;
+let corners: {x: number, y: number}[] = [];
+let draggedCorner: number | null = null;
 
 uploader.addEventListener("change", fileUploaded, false);
 convertBtn.addEventListener("click", convertImage, false);
+dimensionsEdit.addEventListener("input", updateGrid, false);
+editorCanvas.addEventListener("mousedown", startDrag, false);
+editorCanvas.addEventListener("mousemove", drag, false);
+editorCanvas.addEventListener("mouseup", endDrag, false);
+editorCanvas.addEventListener("mouseleave", endDrag, false);
 
 class Spinner {
     constructor(public readonly target: HTMLDivElement) {}

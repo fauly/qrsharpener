@@ -150,13 +150,18 @@
             <div class="input-section">
                 <div class="input-group">
                     <label for="dimensions">Dimensions:</label>
-                    <input id="dimensions" type="number" value="66" />
+                    <input id="dimensions" type="number" value="66" min="1" max="200" />
                 </div>
                 <div class="input-group">
                     <label for="uploader">File:</label>
                     <input id="uploader" type="file" accept="image/*" />
                 </div>
                 <button id="convertBtn" disabled>Convert QR Code</button>
+            </div>
+            <div id="editorSection" style="display: none;">
+                <h3>Adjust QR Code Position</h3>
+                <p>Drag the corner handles to align with the QR code corners. Adjust dimensions to see the grid overlay.</p>
+                <canvas id="editorCanvas" style="max-width: 100%; border: 2px solid #e2e8f0; border-radius: 5px;"></canvas>
             </div>
             <div id="status" class="status"></div>
             <div class="image-section">
