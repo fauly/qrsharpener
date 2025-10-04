@@ -218,6 +218,11 @@ function updateZoomDisplay() {
     zoomLevel.textContent = `Zoom: ${Math.round(zoom * 100)}%`;
 }
 
+function endDrag() {
+    draggedCorner = null;
+    isPanning = false;
+}
+
 async function convertImage() {
     if (!currentBitmap) {
         statusDiv.textContent = "Please upload an image first.";
