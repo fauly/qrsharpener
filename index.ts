@@ -43,11 +43,102 @@ function fileUploaded() {
     createImageBitmap(file).then(bitmap => {
         currentBitmap = bitmap;
         convertBtn.disabled = false;
-        statusDiv.textContent = "Image loaded. Click 'Convert QR Code' to process.";
+        statusDiv.textContent = "Image loaded. Adjust the corners and dimensions, then click 'Convert QR Code'.";
+        showEditor(bitmap);
     }).catch((err: any) => {
         console.error(err);
         statusDiv.textContent = "Error loading image.";
     });
+}
+
+function showEditor(bitmap: ImageBitmap) {
+    editorSection.style.display = "block";
+    editorCanvas.width = bitmap.width;
+    editorCanvas.height = bitmap.height;
+    const ctx = editorCanvas.getContext("2d")!;
+    ctx.drawImage(bitmap, 0, 0);
+    
+    // Initialize corners to image corners
+    corners = [
+        {x: 0, y: 0},
+        {x: bitmap.width, y: 0},
+        {x: bitmap.width, y: bitmap.height},
+        {x: 0, y: bitmap.height}
+    ];
+    
+    updateGrid();
+}
+
+function updateGrid() {
+    if (!currentBitmap) return;
+    const ctx = editorCanvas.getContext("2d")!;
+    ctx.drawImage(currentBitmap, 0, 0);
+    
+    const dimensions = parseInt(dimensionsEdit.value);
+    if (dimensions <= 0) return;
+    
+    // Draw grid
+    ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
+    ctx.lineWidth = 1;
+    
+    const minX = Math.min(...corners.map(c => c.x));
+    const maxX = Math.max(...corners.map(c => c.x));
+    const minY = Math.min(...corners.map(c => c.y));
+    const maxY = Math.max(...corners.map(c => c.y));
+    
+    const width = maxX - minX;
+    const height = maxY - minY;
+    
+    for (let i = 0; i <= dimensions; i++) {
+        const x = minX + (width * i) / dimensions;
+        ctx.beginPath();
+        ctx.moveTo(x, minY);
+        ctx.lineTo(x, maxY);
+        ctx.stroke();
+        
+        const y = minY + (height * i) / dimensions;
+        ctx.beginPath();
+        ctx.moveTo(minX, y);
+        ctx.lineTo(maxX, y);
+        ctx.stroke();
+    }
+    
+    // Draw corner handles
+    ctx.fillStyle = "red";
+    corners.forEach(corner => {
+        ctx.beginPath();
+        ctx.arc(corner.x, corner.y, 8, 0, 2 * Math.PI);
+        ctx.fill();
+    });
+}
+
+function startDrag(e: MouseEvent) {
+    const rect = editorCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    corners.forEach((corner, index) => {
+        if (Math.abs(corner.x - x) < 10 && Math.abs(corner.y - y) < 10) {
+            draggedCorner = index;
+        }
+    });
+}
+
+function drag(e: MouseEvent) {
+    if (draggedCorner === null) return;
+    
+    const rect = editorCanvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    corners[draggedCorner].x = Math.max(0, Math.min(editorCanvas.width, x));
+    corners[draggedCorner].y = Math.max(0, Math.min(editorCanvas.height, y));
+    
+    updateGrid();
+}
+
+function endDrag() {
+    draggedCorner = null;
 }
 
 function convertImage() {
