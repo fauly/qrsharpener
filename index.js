@@ -66,35 +66,24 @@ function showEditor(bitmap) {
     editorSection.style.display = "block";
     
     // Set canvas to fixed display size
-    const canvasRect = editorCanvas.parentElement.getBoundingClientRect();
-    editorCanvas.width = canvasRect.width;
-    editorCanvas.height = canvasRect.height;
+    editorCanvas.width = 600;
+    editorCanvas.height = 400;
     
-    // Calculate scale to fit image in canvas
-    const scaleX = canvasRect.width / bitmap.width;
-    const scaleY = canvasRect.height / bitmap.height;
-    const scale = Math.min(scaleX, scaleY);
+    // Calculate initial scale to fit image in canvas
+    const scaleX = 600 / bitmap.width;
+    const scaleY = 400 / bitmap.height;
+    const initialScale = Math.min(scaleX, scaleY) * 0.9; // Leave some margin
     
     // Reset zoom and pan for new image
-    zoom = scale;
-    panX = 0;
-    panY = 0;
-    
-    // Center the image
-    const scaledWidth = bitmap.width * scale;
-    const scaledHeight = bitmap.height * scale;
-    panX = (canvasRect.width - scaledWidth) / 2;
-    panY = (canvasRect.height - scaledHeight) / 2;
+    zoom = initialScale;
+    panX = (600 - bitmap.width * initialScale) / 2;
+    panY = (400 - bitmap.height * initialScale) / 2;
     
     updateZoomDisplay();
     
-    // Calculate scale factors based on displayed size vs actual size
-    scaleX = bitmap.width / canvasRect.width;
-    scaleY = bitmap.height / canvasRect.height;
+    // Store bitmap for redrawing
+    currentBitmap = bitmap;
     
-    const ctx = editorCanvas.getContext("2d");
-    ctx.drawImage(bitmap, 0, 0);
-
     // Initialize corners to image corners
     corners = [
         {x: 0, y: 0},
