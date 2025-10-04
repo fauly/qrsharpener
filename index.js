@@ -201,8 +201,11 @@ function checkHover(e) {
     if (!currentBitmap) return;
     
     const rect = editorCanvas.getBoundingClientRect();
-    const canvasX = e.clientX - rect.left;
-    const canvasY = e.clientY - rect.top;
+    // Scale mouse coordinates to match internal canvas coordinate system
+    const scaleX = editorCanvas.width / rect.width;
+    const scaleY = editorCanvas.height / rect.height;
+    const canvasX = (e.clientX - rect.left) * scaleX;
+    const canvasY = (e.clientY - rect.top) * scaleY;
     
     // Convert to image coordinates
     const imageX = (canvasX - panX) / zoom;
@@ -235,17 +238,28 @@ function drawMagnifier(ctx, corner) {
     const magnifierX = corner.x > currentBitmap.width / 2 ? corner.x - magnifierSize - 20 : corner.x + 20;
     const magnifierY = corner.y > currentBitmap.height / 2 ? corner.y - magnifierSize - 20 : corner.y + 20;
     
+    // Ensure magnifier stays within canvas bounds
+    const clampedMagnifierX = Math.max(10, Math.min(editorCanvas.width - magnifierSize - 10, magnifierX));
+    const clampedMagnifierY = Math.max(10, Math.min(editorCanvas.height - magnifierSize - 30, magnifierY));
+    
     // Draw magnifier background
     ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
-    ctx.fillRect(magnifierX - 2, magnifierY - 2, magnifierSize + 4, magnifierSize + 4);
+    ctx.fillRect(clampedMagnifierX - 2, clampedMagnifierY - 2, magnifierSize + 4, magnifierSize + 4);
     ctx.fillStyle = "white";
-    ctx.fillRect(magnifierX, magnifierY, magnifierSize, magnifierSize);
+    ctx.fillRect(clampedMagnifierX, clampedMagnifierY, magnifierSize, magnifierSize);
     
-    // Draw magnified pixels
-    const startX = Math.max(0, Math.floor(corner.x) - pixelRadius);
-    const startY = Math.max(0, Math.floor(corner.y) - pixelRadius);
-    const endX = Math.min(currentBitmap.width, Math.floor(corner.x) + pixelRadius + 1);
-    const endY = Math.min(currentBitmap.height, Math.floor(corner.y) + pixelRadius + 1);
+    // Calculate safe bounds for pixel sampling
+    const centerX = Math.floor(corner.x);
+    const centerY = Math.floor(corner.y);
+    const startX = Math.max(0, centerX - pixelRadius);
+    const startY = Math.max(0, centerY - pixelRadius);
+    const endX = Math.min(currentBitmap.width, centerX + pixelRadius + 1);
+    const endY = Math.min(currentBitmap.height, centerY + pixelRadius + 1);
+    
+    const actualWidth = endX - startX;
+    const actualHeight = endY - startY;
+    
+    if (actualWidth <= 0 || actualHeight <= 0) return;
     
     const pixelSize = magnifierSize / ((pixelRadius * 2) + 1);
     
@@ -255,19 +269,19 @@ function drawMagnifier(ctx, corner) {
     tempCanvas.height = currentBitmap.height;
     const tempCtx = tempCanvas.getContext("2d");
     tempCtx.drawImage(currentBitmap, 0, 0);
-    const imageData = tempCtx.getImageData(startX, startY, endX - startX, endY - startY);
+    const imageData = tempCtx.getImageData(startX, startY, actualWidth, actualHeight);
     
     // Draw magnified pixels
-    for (let y = startY; y < endY; y++) {
-        for (let x = startX; x < endX; x++) {
-            const pixelIndex = ((y - startY) * (endX - startX) + (x - startX)) * 4;
+    for (let y = 0; y < actualHeight; y++) {
+        for (let x = 0; x < actualWidth; x++) {
+            const pixelIndex = (y * actualWidth + x) * 4;
             const r = imageData.data[pixelIndex];
             const g = imageData.data[pixelIndex + 1];
             const b = imageData.data[pixelIndex + 2];
             
             ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
-            const drawX = magnifierX + (x - startX) * pixelSize;
-            const drawY = magnifierY + (y - startY) * pixelSize;
+            const drawX = clampedMagnifierX + (x - (centerX - startX)) * pixelSize + (magnifierSize / 2) - (pixelSize / 2);
+            const drawY = clampedMagnifierY + (y - (centerY - startY)) * pixelSize + (magnifierSize / 2) - (pixelSize / 2);
             ctx.fillRect(drawX, drawY, pixelSize, pixelSize);
         }
     }
@@ -275,29 +289,36 @@ function drawMagnifier(ctx, corner) {
     // Draw crosshair at center
     ctx.strokeStyle = "red";
     ctx.lineWidth = 1;
-    const centerX = magnifierX + pixelRadius * pixelSize;
-    const centerY = magnifierY + pixelRadius * pixelSize;
+    const centerDrawX = clampedMagnifierX + magnifierSize / 2;
+    const centerDrawY = clampedMagnifierY + magnifierSize / 2;
     ctx.beginPath();
-    ctx.moveTo(centerX - 5, centerY);
-    ctx.lineTo(centerX + 5, centerY);
-    ctx.moveTo(centerX, centerY - 5);
-    ctx.lineTo(centerX, centerY + 5);
+    ctx.moveTo(centerDrawX - 5, centerDrawY);
+    ctx.lineTo(centerDrawX + 5, centerDrawY);
+    ctx.moveTo(centerDrawX, centerDrawY - 5);
+    ctx.lineTo(centerDrawX, centerDrawY + 5);
     ctx.stroke();
     
+    // Get RGB values of the center pixel (clamp to image bounds)
+    const clampedCenterX = Math.max(0, Math.min(currentBitmap.width - 1, centerX));
+    const clampedCenterY = Math.max(0, Math.min(currentBitmap.height - 1, centerY));
+    const centerImageData = tempCtx.getImageData(clampedCenterX, clampedCenterY, 1, 1);
+    const r = centerImageData.data[0];
+    const g = centerImageData.data[1];
+    const b = centerImageData.data[2];
+    
     // Draw RGB values
-    const centerPixelIndex = (pixelRadius * (endX - startX) + pixelRadius) * 4;
-    const r = imageData.data[centerPixelIndex];
-    const g = imageData.data[centerPixelIndex + 1];
-    const b = imageData.data[centerPixelIndex + 2];
     ctx.fillStyle = "black";
     ctx.font = "12px Arial";
-    ctx.fillText(`R:${r} G:${g} B:${b}`, magnifierX, magnifierY + magnifierSize + 15);
+    ctx.fillText(`R:${r} G:${g} B:${b}`, clampedMagnifierX, clampedMagnifierY + magnifierSize + 15);
 }
 
 function startDrag(e) {
     const rect = editorCanvas.getBoundingClientRect();
-    const canvasX = e.clientX - rect.left;
-    const canvasY = e.clientY - rect.top;
+    // Scale mouse coordinates to match internal canvas coordinate system
+    const scaleX = editorCanvas.width / rect.width;
+    const scaleY = editorCanvas.height / rect.height;
+    const canvasX = (e.clientX - rect.left) * scaleX;
+    const canvasY = (e.clientY - rect.top) * scaleY;
     
     // Convert to image coordinates (inverse of ctx.translate(panX, panY); ctx.scale(zoom, zoom))
     const imageX = (canvasX - panX) / zoom;
@@ -325,8 +346,11 @@ function startDrag(e) {
 function drag(e) {
     if (draggedCorner !== null) {
         const rect = editorCanvas.getBoundingClientRect();
-        const canvasX = e.clientX - rect.left;
-        const canvasY = e.clientY - rect.top;
+        // Scale mouse coordinates to match internal canvas coordinate system
+        const scaleX = editorCanvas.width / rect.width;
+        const scaleY = editorCanvas.height / rect.height;
+        const canvasX = (e.clientX - rect.left) * scaleX;
+        const canvasY = (e.clientY - rect.top) * scaleY;
         
         // Convert to image coordinates (inverse of ctx.translate(panX, panY); ctx.scale(zoom, zoom))
         const imageX = (canvasX - panX) / zoom;
@@ -340,8 +364,11 @@ function drag(e) {
         // Pan the view
         const deltaX = e.clientX - lastPanX;
         const deltaY = e.clientY - lastPanY;
-        panX += deltaX;
-        panY += deltaY;
+        // Scale deltas to match internal canvas coordinate system
+        const scaleX = editorCanvas.width / rect.width;
+        const scaleY = editorCanvas.height / rect.height;
+        panX += deltaX * scaleX;
+        panY += deltaY * scaleY;
         lastPanX = e.clientX;
         lastPanY = e.clientY;
         updateGrid();
