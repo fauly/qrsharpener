@@ -150,13 +150,32 @@ function convertImage() {
     const spinner = new Spinner(statusDiv);
     spinner.start();
     try {
-        processFile(currentBitmap);
+        // Create cropped bitmap based on corners
+        const croppedBitmap = cropToRectangle(currentBitmap, corners);
+        processFile(croppedBitmap);
         statusDiv.textContent = "Processing complete.";
     } catch (err: any) {
         console.error(err);
         statusDiv.textContent = "Error processing image.";
     }
     spinner.stop();
+}
+
+function cropToRectangle(bitmap: ImageBitmap, corners: {x: number, y: number}[]): ImageBitmap {
+    const minX = Math.min(...corners.map(c => c.x));
+    const maxX = Math.max(...corners.map(c => c.x));
+    const minY = Math.min(...corners.map(c => c.y));
+    const maxY = Math.max(...corners.map(c => c.y));
+    
+    const width = maxX - minX;
+    const height = maxY - minY;
+    
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(bitmap, minX, minY, width, height, 0, 0, width, height);
+    
+    return canvas.transferToImageBitmap();
 }
 
 function processFile(bitmap: ImageBitmap) {
