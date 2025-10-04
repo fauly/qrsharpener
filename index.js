@@ -124,11 +124,11 @@ function updateGrid() {
 
 function startDrag(e) {
     const rect = editorCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
     corners.forEach((corner, index) => {
-        if (Math.abs(corner.x - x) < 10 && Math.abs(corner.y - y) < 10) {
+        if (Math.abs(corner.x - x) < 10 * scaleX && Math.abs(corner.y - y) < 10 * scaleY) {
             draggedCorner = index;
         }
     });
@@ -138,8 +138,8 @@ function drag(e) {
     if (draggedCorner === null) return;
 
     const rect = editorCanvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
     corners[draggedCorner].x = Math.max(0, Math.min(editorCanvas.width, x));
     corners[draggedCorner].y = Math.max(0, Math.min(editorCanvas.height, y));
