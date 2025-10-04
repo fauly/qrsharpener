@@ -27,6 +27,7 @@ let lastPanY = 0;
 
 uploader.addEventListener("change", fileUploaded, false);
 convertBtn.addEventListener("click", convertImage, false);
+dimensionsEdit.addEventListener("input", updateGrid, false);
 zoomInBtn.addEventListener("click", () => zoomCanvas(1.2));
 zoomOutBtn.addEventListener("click", () => zoomCanvas(0.8));
 resetZoomBtn.addEventListener("click", resetZoom);
