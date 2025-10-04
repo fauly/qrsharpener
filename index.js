@@ -152,29 +152,55 @@ function updateGrid() {
         return;
     }
 
-    // Draw grid
+    // Draw grid with perspective correction
     ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
-    ctx.lineWidth = 1 / zoom; // Adjust line width for zoom
+    ctx.lineWidth = 1 / zoom;
 
-    const minX = Math.min(...corners.map(c => c.x));
-    const maxX = Math.max(...corners.map(c => c.x));
-    const minY = Math.min(...corners.map(c => c.y));
-    const maxY = Math.max(...corners.map(c => c.y));
-
-    const width = maxX - minX;
-    const height = maxY - minY;
+    // Sort corners for consistent ordering: top-left, top-right, bottom-right, bottom-left
+    const sortedCorners = [...corners].sort((a, b) => {
+        if (Math.abs(a.y - b.y) < 10) return a.x - b.x; // Same row, sort by x
+        return a.y - b.y; // Different rows, sort by y
+    });
 
     for (let i = 0; i <= validDimensions; i++) {
-        const x = minX + (width * i) / validDimensions;
+        const t = i / validDimensions;
+
+        // Draw vertical grid lines (interpolated between left and right edges)
+        const leftTop = sortedCorners[0];    // top-left
+        const leftBottom = sortedCorners[3]; // bottom-left
+        const rightTop = sortedCorners[1];   // top-right
+        const rightBottom = sortedCorners[2]; // bottom-right
+
+        // Interpolate left edge
+        const leftX = leftTop.x + t * (leftBottom.x - leftTop.x);
+        const leftY = leftTop.y + t * (leftBottom.y - leftTop.y);
+
+        // Interpolate right edge
+        const rightX = rightTop.x + t * (rightBottom.x - rightTop.x);
+        const rightY = rightTop.y + t * (rightBottom.y - rightTop.y);
+
         ctx.beginPath();
-        ctx.moveTo(x, minY);
-        ctx.lineTo(x, maxY);
+        ctx.moveTo(leftX, leftY);
+        ctx.lineTo(rightX, rightY);
         ctx.stroke();
 
-        const y = minY + (height * i) / validDimensions;
+        // Draw horizontal grid lines (interpolated between top and bottom edges)
+        const topLeft = sortedCorners[0];     // top-left
+        const topRight = sortedCorners[1];    // top-right
+        const bottomLeft = sortedCorners[3];  // bottom-left
+        const bottomRight = sortedCorners[2]; // bottom-right
+
+        // Interpolate top edge
+        const topX = topLeft.x + t * (topRight.x - topLeft.x);
+        const topY = topLeft.y + t * (topRight.y - topLeft.y);
+
+        // Interpolate bottom edge
+        const bottomX = bottomLeft.x + t * (bottomRight.x - bottomLeft.x);
+        const bottomY = bottomLeft.y + t * (bottomRight.y - bottomLeft.y);
+
         ctx.beginPath();
-        ctx.moveTo(minX, y);
-        ctx.lineTo(maxX, y);
+        ctx.moveTo(topX, topY);
+        ctx.lineTo(bottomX, bottomY);
         ctx.stroke();
     }
 
