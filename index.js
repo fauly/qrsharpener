@@ -150,25 +150,43 @@ function startDrag(e) {
     const x = ((e.clientX - rect.left) - panX) / zoom;
     const y = ((e.clientY - rect.top) - panY) / zoom;
 
+    let foundCorner = false;
     corners.forEach((corner, index) => {
         const handleSize = 10 / zoom;
         if (Math.abs(corner.x - x) < handleSize && Math.abs(corner.y - y) < handleSize) {
             draggedCorner = index;
+            foundCorner = true;
         }
     });
+    
+    if (!foundCorner) {
+        // Start panning
+        isPanning = true;
+        lastPanX = e.clientX;
+        lastPanY = e.clientY;
+    }
 }
 
 function drag(e) {
-    if (draggedCorner === null) return;
+    if (draggedCorner !== null) {
+        const rect = editorCanvas.getBoundingClientRect();
+        const x = ((e.clientX - rect.left) - panX) / zoom;
+        const y = ((e.clientY - rect.top) - panY) / zoom;
 
-    const rect = editorCanvas.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) - panX) / zoom;
-    const y = ((e.clientY - rect.top) - panY) / zoom;
+        corners[draggedCorner].x = Math.max(0, Math.min(editorCanvas.width, x));
+        corners[draggedCorner].y = Math.max(0, Math.min(editorCanvas.height, y));
 
-    corners[draggedCorner].x = Math.max(0, Math.min(editorCanvas.width, x));
-    corners[draggedCorner].y = Math.max(0, Math.min(editorCanvas.height, y));
-
-    updateGrid();
+        updateGrid();
+    } else if (isPanning) {
+        // Pan the view
+        const deltaX = e.clientX - lastPanX;
+        const deltaY = e.clientY - lastPanY;
+        panX += deltaX;
+        panY += deltaY;
+        lastPanX = e.clientX;
+        lastPanY = e.clientY;
+        updateGrid();
+    }
 }
 
 function zoomCanvas(factor) {
