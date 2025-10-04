@@ -60,10 +60,10 @@ function showEditor(bitmap) {
     editorCanvas.width = bitmap.width;
     editorCanvas.height = bitmap.height;
     
-    // Calculate scale factors for mouse coordinate conversion
-    const containerRect = editorCanvas.parentElement.getBoundingClientRect();
-    scaleX = bitmap.width / containerRect.width;
-    scaleY = bitmap.height / containerRect.height;
+    // Calculate scale factors based on displayed size vs actual size
+    const rect = editorCanvas.getBoundingClientRect();
+    scaleX = bitmap.width / rect.width;
+    scaleY = bitmap.height / rect.height;
     
     const ctx = editorCanvas.getContext("2d");
     ctx.drawImage(bitmap, 0, 0);
