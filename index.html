@@ -1,34 +1,157 @@
 <html>
     <head>
+        <title>QR Code Sharpener</title>
         <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                margin: 0;
+                padding: 20px;
+                min-height: 100vh;
+                color: #333;
+            }
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                background: white;
+                border-radius: 10px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+                padding: 30px;
+                box-sizing: border-box;
+            }
+            h1 {
+                text-align: center;
+                color: #4a5568;
+                margin-bottom: 10px;
+                font-size: 2.5em;
+            }
+            .description {
+                text-align: center;
+                color: #718096;
+                font-size: 1.1em;
+                line-height: 1.6;
+                margin-bottom: 30px;
+            }
+            .input-section {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 20px;
+                margin-bottom: 20px;
+                flex-wrap: wrap;
+            }
+            .input-group {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            label {
+                font-weight: bold;
+                margin-bottom: 5px;
+                color: #4a5568;
+            }
+            input[type="number"] {
+                padding: 10px;
+                border: 2px solid #e2e8f0;
+                border-radius: 5px;
+                font-size: 1em;
+                width: 80px;
+                text-align: center;
+            }
+            input[type="file"] {
+                padding: 10px;
+                border: 2px solid #e2e8f0;
+                border-radius: 5px;
+                background: #f7fafc;
+                cursor: pointer;
+            }
+            input[type="file"]:hover {
+                background: #edf2f7;
+            }
+            .status {
+                text-align: center;
+                font-weight: bold;
+                color: #3182ce;
+                margin: 20px 0;
+                min-height: 20px;
+            }
+            .image-section {
+                display: flex;
+                justify-content: space-around;
+                flex-wrap: wrap;
+                gap: 20px;
+                margin-top: 30px;
+            }
+            .image-container {
+                flex: 1;
+                min-width: 300px;
+                text-align: center;
+            }
+            .image-container h3 {
+                color: #4a5568;
+                margin-bottom: 10px;
+            }
             img {
-                image-rendering: pixelated
+                image-rendering: pixelated;
+                max-width: 100%;
+                height: auto;
+                border: 2px solid #e2e8f0;
+                border-radius: 5px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            }
+            @media (max-width: 768px) {
+                .container {
+                    padding: 20px;
+                }
+                h1 {
+                    font-size: 2em;
+                }
+                .input-section {
+                    flex-direction: column;
+                }
+                .image-section {
+                    flex-direction: column;
+                }
             }
         </style>
     </head>
     <body>
-        <h1>QR Code Sharpener</h1>
-        <p>This tool tries recreate a QR code from blurry QR code images by segmenting the image into n times n
-            pieces and then guess whether the piece is white or black.
-        </p>
-        <p>
-            First, choose the dimensions
-            (e.g. 29 for a 29x29 Version 3 QR Code, or 66 for a 66x66 custom QR Code, see
-            <a href="https://en.wikipedia.org/wiki/QR_code">wikipedia</a> for QR code types).
-            Then, upload the image. The tool will compute the result and also an annotated
-            image of your QR code, with red dots where it thinks the center of each QR code block
-            is (zoom in if you don't see the red pixels). If the red dots are off, use an image manipulation program to crop/transform your QR code.<br/>
-        </p>
-        Dimensions: <input id="dimensions" type="number" value="66" />&nbsp;
-        File: <input id="uploader" type="file" accept="image/*" />
-        <br/>
-        <div id="status"></div>
-        <br/><br/>
-        Result Image:<br/>
-        <img id="resultImage" width="50%"/>
-        <br/><br/>
-        Annotated Image:<br/>
-        <img id="annotatedImage" width="50%"/>
+        <div class="container">
+            <h1>QR Code Sharpener</h1>
+            <p class="description">
+                This tool tries recreate a QR code from blurry QR code images by segmenting the image into n times n
+                pieces and then guessing whether the piece is white or black.
+            </p>
+            <p class="description">
+                First, choose the dimensions
+                (e.g. 29 for a 29x29 Version 3 QR Code, or 66 for a 66x66 custom QR Code, see
+                <a href="https://en.wikipedia.org/wiki/QR_code" target="_blank">wikipedia</a> for QR code types).
+                Then, upload the image. The tool will compute the result and also an annotated
+                image of your QR code, with red dots where it thinks the center of each QR code block
+                is (zoom in if you don't see the red pixels). If the red dots are off, use an image manipulation program to crop/transform your QR code.
+            </p>
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="dimensions">Dimensions:</label>
+                    <input id="dimensions" type="number" value="66" />
+                </div>
+                <div class="input-group">
+                    <label for="uploader">File:</label>
+                    <input id="uploader" type="file" accept="image/*" />
+                </div>
+            </div>
+            <div id="status" class="status"></div>
+            <div class="image-section">
+                <div class="image-container">
+                    <h3>Result Image</h3>
+                    <img id="resultImage" />
+                </div>
+                <div class="image-container">
+                    <h3>Annotated Image</h3>
+                    <img id="annotatedImage" />
+                </div>
+            </div>
+        </div>
         <script type="module" src="index.ts"></script>
     </body>
 </html>
