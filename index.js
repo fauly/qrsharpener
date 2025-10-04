@@ -10,6 +10,9 @@ const zoomInBtn = document.getElementById("zoomInBtn");
 const zoomOutBtn = document.getElementById("zoomOutBtn");
 const resetZoomBtn = document.getElementById("resetZoomBtn");
 const zoomLevel = document.getElementById("zoomLevel");
+const editorSection = document.getElementById("editorSection");
+const editorCanvas = document.getElementById("editorCanvas");
+const previewCanvas = document.getElementById("previewCanvas");
 const canvas = document.createElement("canvas");
 const resultCanvas = document.createElement("canvas");
 
@@ -116,6 +119,7 @@ function updateGrid() {
     const dimensions = parseInt(dimensionsEdit.value);
     if (dimensions <= 0) {
         ctx.restore();
+        updatePreview();
         return;
     }
 
@@ -155,6 +159,7 @@ function updateGrid() {
     });
     
     ctx.restore();
+    updatePreview();
 }
 
 function startDrag(e) {
@@ -238,9 +243,40 @@ function updateZoomDisplay() {
     zoomLevel.textContent = `Zoom: ${Math.round(zoom * 100)}%`;
 }
 
-function endDrag() {
-    draggedCorner = null;
-    isPanning = false;
+function updatePreview() {
+    if (!currentBitmap) return;
+    
+    const dimensions = parseInt(dimensionsEdit.value);
+    if (dimensions <= 0) return;
+    
+    // Create cropped image data based on corners
+    const minX = Math.min(...corners.map(c => c.x));
+    const maxX = Math.max(...corners.map(c => c.x));
+    const minY = Math.min(...corners.map(c => c.y));
+    const maxY = Math.max(...corners.map(c => c.y));
+    
+    const cropWidth = Math.max(1, maxX - minX);
+    const cropHeight = Math.max(1, maxY - minY);
+    
+    // Create temporary canvas for cropping
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = cropWidth;
+    tempCanvas.height = cropHeight;
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCtx.drawImage(currentBitmap, minX, minY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    
+    const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
+    
+    // Generate QR using the same algorithm
+    const sharpener = new QRSharpener(dimensions, 50);
+    const result = sharpener.sharpen(imageData);
+    
+    // Display on preview canvas
+    const previewCtx = previewCanvas.getContext("2d");
+    const previewImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), dimensions, dimensions);
+    previewCanvas.width = dimensions;
+    previewCanvas.height = dimensions;
+    previewCtx.putImageData(previewImageData, 0, 0);
 }
 
 async function convertImage() {

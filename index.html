@@ -187,6 +187,31 @@
                 font-weight: bold;
                 color: #4a5568;
             }
+            .editor-main {
+                display: flex;
+                gap: 20px;
+                justify-content: center;
+                align-items: flex-start;
+                flex-wrap: wrap;
+            }
+            .preview-wrapper {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+            }
+            .preview-wrapper h4 {
+                margin: 0 0 10px 0;
+                color: #4a5568;
+            }
+            #previewCanvas {
+                border: 2px solid #e2e8f0;
+                border-radius: 5px;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+                background: white;
+                width: 200px;
+                height: 200px;
+                image-rendering: pixelated;
+            }
         </style>
     </head>
     <body>
@@ -211,15 +236,21 @@
             </div>
             <div id="editorSection" style="display: none;">
                 <h3>Adjust QR Code Position</h3>
-                <p>Drag the corner handles to align with the QR code corners. Adjust dimensions to see the grid overlay. Use zoom controls or mouse wheel to zoom in/out.</p>
+                <p>Drag the corner handles to align with the QR code corners. Adjust dimensions to see the grid overlay. The live preview shows your reconstructed QR code.</p>
                 <div class="editor-controls">
                     <button id="zoomInBtn">+</button>
                     <button id="zoomOutBtn">-</button>
                     <button id="resetZoomBtn">Reset Zoom</button>
                     <span id="zoomLevel">Zoom: 100%</span>
                 </div>
-                <div class="canvas-wrapper">
-                    <canvas id="editorCanvas"></canvas>
+                <div class="editor-main">
+                    <div class="canvas-wrapper">
+                        <canvas id="editorCanvas"></canvas>
+                    </div>
+                    <div class="preview-wrapper">
+                        <h4>Live QR Preview</h4>
+                        <canvas id="previewCanvas"></canvas>
+                    </div>
                 </div>
                 <div style="text-align: center; margin-top: 20px;">
                     <button id="convertBtn" disabled>Convert QR Code</button>
