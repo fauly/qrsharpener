@@ -176,7 +176,7 @@ function updateGrid() {
 
     // Draw corner handles (adjust size for zoom)
     ctx.fillStyle = "red";
-    const handleSize = Math.max(8, 15 / zoom); // Minimum 8 pixels in image space
+    const handleSize = Math.max(4, 8 / zoom); // Smaller handles: minimum 4 pixels in image space
     corners.forEach(corner => {
         ctx.beginPath();
         ctx.arc(corner.x, corner.y, handleSize, 0, 2 * Math.PI);
@@ -193,12 +193,12 @@ function startDrag(e) {
     const canvasY = e.clientY - rect.top;
     
     // Convert to image coordinates (inverse of ctx.translate(panX, panY); ctx.scale(zoom, zoom))
-    const imageX = (canvasX / zoom) - panX;
-    const imageY = (canvasY / zoom) - panY;
+    const imageX = (canvasX - panX) / zoom;
+    const imageY = (canvasY - panY) / zoom;
 
     let foundCorner = false;
     corners.forEach((corner, index) => {
-        const handleSize = Math.max(15, 20 / zoom); // Minimum 15 pixels, scales with zoom
+        const handleSize = Math.max(6, 12 / zoom); // Smaller handles: minimum 6 pixels, scales with zoom
         const distX = Math.abs(corner.x - imageX);
         const distY = Math.abs(corner.y - imageY);
         if (distX < handleSize && distY < handleSize) {
@@ -222,8 +222,8 @@ function drag(e) {
         const canvasY = e.clientY - rect.top;
         
         // Convert to image coordinates (inverse of ctx.translate(panX, panY); ctx.scale(zoom, zoom))
-        const imageX = (canvasX / zoom) - panX;
-        const imageY = (canvasY / zoom) - panY;
+        const imageX = (canvasX - panX) / zoom;
+        const imageY = (canvasY - panY) / zoom;
 
         corners[draggedCorner].x = Math.max(0, Math.min(currentBitmap.width, imageX));
         corners[draggedCorner].y = Math.max(0, Math.min(currentBitmap.height, imageY));
