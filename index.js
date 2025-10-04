@@ -173,9 +173,9 @@ function startDrag(e) {
     const canvasX = e.clientX - rect.left;
     const canvasY = e.clientY - rect.top;
     
-    // Convert to image coordinates
-    const imageX = (canvasX - panX) / zoom;
-    const imageY = (canvasY - panY) / zoom;
+    // Convert to image coordinates (inverse of ctx.translate(panX, panY); ctx.scale(zoom, zoom))
+    const imageX = (canvasX / zoom) - panX;
+    const imageY = (canvasY / zoom) - panY;
 
     let foundCorner = false;
     corners.forEach((corner, index) => {
@@ -202,9 +202,9 @@ function drag(e) {
         const canvasX = e.clientX - rect.left;
         const canvasY = e.clientY - rect.top;
         
-        // Convert to image coordinates
-        const imageX = (canvasX - panX) / zoom;
-        const imageY = (canvasY - panY) / zoom;
+        // Convert to image coordinates (inverse of ctx.translate(panX, panY); ctx.scale(zoom, zoom))
+        const imageX = (canvasX / zoom) - panX;
+        const imageY = (canvasY / zoom) - panY;
 
         corners[draggedCorner].x = Math.max(0, Math.min(currentBitmap.width, imageX));
         corners[draggedCorner].y = Math.max(0, Math.min(currentBitmap.height, imageY));
