@@ -6,8 +6,10 @@ const uploader = document.getElementById("uploader");
 const convertBtn = document.getElementById("convertBtn");
 const statusDiv = document.getElementById("status");
 const dimensionsEdit = document.getElementById("dimensions");
-const editorSection = document.getElementById("editorSection");
-const editorCanvas = document.getElementById("editorCanvas");
+const zoomInBtn = document.getElementById("zoomInBtn");
+const zoomOutBtn = document.getElementById("zoomOutBtn");
+const resetZoomBtn = document.getElementById("resetZoomBtn");
+const zoomLevel = document.getElementById("zoomLevel");
 const canvas = document.createElement("canvas");
 const resultCanvas = document.createElement("canvas");
 
