@@ -27,6 +27,7 @@ let panY = 0;
 let isPanning = false;
 let lastPanX = 0;
 let lastPanY = 0;
+let hoveredCorner = null; // Track which corner is being hovered
 
 // Debounce function for input fields
 function debounce(func, wait) {
@@ -184,7 +185,110 @@ function updateGrid() {
     });
     
     ctx.restore();
+    
+    // Draw magnified view if hovering over a corner
+    if (hoveredCorner !== null) {
+        drawMagnifier(ctx, corners[hoveredCorner]);
+    }
+    
     updatePreview();
+}
+
+function checkHover(e) {
+    if (!currentBitmap) return;
+    
+    const rect = editorCanvas.getBoundingClientRect();
+    const canvasX = e.clientX - rect.left;
+    const canvasY = e.clientY - rect.top;
+    
+    // Convert to image coordinates
+    const imageX = (canvasX - panX) / zoom;
+    const imageY = (canvasY - panY) / zoom;
+
+    let foundHover = false;
+    corners.forEach((corner, index) => {
+        const handleSize = Math.max(6, 12 / zoom);
+        const distX = Math.abs(corner.x - imageX);
+        const distY = Math.abs(corner.y - imageY);
+        if (distX < handleSize && distY < handleSize) {
+            hoveredCorner = index;
+            foundHover = true;
+        }
+    });
+    
+    if (!foundHover) {
+        hoveredCorner = null;
+    }
+    
+    updateGrid();
+}
+
+function drawMagnifier(ctx, corner) {
+    const magnifierSize = 60; // Size of the magnifier window
+    const zoomFactor = 8; // How much to zoom in
+    const pixelRadius = 3; // How many pixels around the center to show
+    
+    // Position the magnifier near the corner but not overlapping
+    const magnifierX = corner.x > currentBitmap.width / 2 ? corner.x - magnifierSize - 20 : corner.x + 20;
+    const magnifierY = corner.y > currentBitmap.height / 2 ? corner.y - magnifierSize - 20 : corner.y + 20;
+    
+    // Draw magnifier background
+    ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+    ctx.fillRect(magnifierX - 2, magnifierY - 2, magnifierSize + 4, magnifierSize + 4);
+    ctx.fillStyle = "white";
+    ctx.fillRect(magnifierX, magnifierY, magnifierSize, magnifierSize);
+    
+    // Draw magnified pixels
+    const startX = Math.max(0, Math.floor(corner.x) - pixelRadius);
+    const startY = Math.max(0, Math.floor(corner.y) - pixelRadius);
+    const endX = Math.min(currentBitmap.width, Math.floor(corner.x) + pixelRadius + 1);
+    const endY = Math.min(currentBitmap.height, Math.floor(corner.y) + pixelRadius + 1);
+    
+    const pixelSize = magnifierSize / ((pixelRadius * 2) + 1);
+    
+    // Get image data for the magnified area
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = currentBitmap.width;
+    tempCanvas.height = currentBitmap.height;
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCtx.drawImage(currentBitmap, 0, 0);
+    const imageData = tempCtx.getImageData(startX, startY, endX - startX, endY - startY);
+    
+    // Draw magnified pixels
+    for (let y = startY; y < endY; y++) {
+        for (let x = startX; x < endX; x++) {
+            const pixelIndex = ((y - startY) * (endX - startX) + (x - startX)) * 4;
+            const r = imageData.data[pixelIndex];
+            const g = imageData.data[pixelIndex + 1];
+            const b = imageData.data[pixelIndex + 2];
+            
+            ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+            const drawX = magnifierX + (x - startX) * pixelSize;
+            const drawY = magnifierY + (y - startY) * pixelSize;
+            ctx.fillRect(drawX, drawY, pixelSize, pixelSize);
+        }
+    }
+    
+    // Draw crosshair at center
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 1;
+    const centerX = magnifierX + pixelRadius * pixelSize;
+    const centerY = magnifierY + pixelRadius * pixelSize;
+    ctx.beginPath();
+    ctx.moveTo(centerX - 5, centerY);
+    ctx.lineTo(centerX + 5, centerY);
+    ctx.moveTo(centerX, centerY - 5);
+    ctx.lineTo(centerX, centerY + 5);
+    ctx.stroke();
+    
+    // Draw RGB values
+    const centerPixelIndex = (pixelRadius * (endX - startX) + pixelRadius) * 4;
+    const r = imageData.data[centerPixelIndex];
+    const g = imageData.data[centerPixelIndex + 1];
+    const b = imageData.data[centerPixelIndex + 2];
+    ctx.fillStyle = "black";
+    ctx.font = "12px Arial";
+    ctx.fillText(`R:${r} G:${g} B:${b}`, magnifierX, magnifierY + magnifierSize + 15);
 }
 
 function startDrag(e) {
