@@ -99,18 +99,24 @@ function updateGrid() {
     if (!currentBitmap) return;
     const ctx = editorCanvas.getContext("2d");
     
-    // Clear and reset transform
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Clear canvas
     ctx.clearRect(0, 0, editorCanvas.width, editorCanvas.height);
     
-    // Apply zoom and pan
+    // Save context for transformations
+    ctx.save();
+    
+    // Apply pan and zoom
     ctx.translate(panX, panY);
     ctx.scale(zoom, zoom);
     
+    // Draw the image
     ctx.drawImage(currentBitmap, 0, 0);
 
     const dimensions = parseInt(dimensionsEdit.value);
-    if (dimensions <= 0) return;
+    if (dimensions <= 0) {
+        ctx.restore();
+        return;
+    }
 
     // Draw grid
     ctx.strokeStyle = "rgba(255, 0, 0, 0.5)";
@@ -146,6 +152,8 @@ function updateGrid() {
         ctx.arc(corner.x, corner.y, handleSize, 0, 2 * Math.PI);
         ctx.fill();
     });
+    
+    ctx.restore();
 }
 
 function startDrag(e) {
