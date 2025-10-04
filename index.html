@@ -50,13 +50,15 @@
                 margin-bottom: 5px;
                 color: #4a5568;
             }
-            input[type="number"] {
-                padding: 10px;
-                border: 2px solid #e2e8f0;
-                border-radius: 5px;
-                font-size: 1em;
+            input[type="range"] {
                 width: 80px;
-                text-align: center;
+                margin-right: 10px;
+            }
+            #thresholdValue {
+                font-weight: bold;
+                color: #4a5568;
+                min-width: 20px;
+                display: inline-block;
             }
             input[type="file"] {
                 padding: 10px;
@@ -207,6 +209,11 @@
                 <div class="input-group">
                     <label for="dimensions">Dimensions:</label>
                     <input id="dimensions" type="number" value="66" min="1" max="177" placeholder="1-177" />
+                </div>
+                <div class="input-group">
+                    <label for="threshold">Threshold:</label>
+                    <input id="threshold" type="range" min="0" max="255" value="50" />
+                    <span id="thresholdValue">50</span>
                 </div>
                 <div class="input-group">
                     <label for="uploader">File:</label>

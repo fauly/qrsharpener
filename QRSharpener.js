@@ -64,8 +64,9 @@ export class QRSharpener {
             for (let x = 0; x < this.dimension; ++x) {
 
                 // Map grid position to quadrilateral position using bilinear interpolation
-                const t_x = x / Math.max(1, this.dimension - 1);
-                const t_y = y / Math.max(1, this.dimension - 1);
+                // Sample at the center of each grid cell
+                const t_x = (x + 0.5) / this.dimension;
+                const t_y = (y + 0.5) / this.dimension;
 
                 // Interpolate along top and bottom edges
                 const topX = topLeft.x + t_x * (topRight.x - topLeft.x);

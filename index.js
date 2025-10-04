@@ -3,6 +3,8 @@ import { QRSharpener } from "./QRSharpener.js";
 const annotatedImage = document.getElementById("annotatedImage");
 const resultImage = document.getElementById("resultImage");
 const croppedImage = document.getElementById("croppedImage");
+const threshold = document.getElementById("threshold");
+const thresholdValue = document.getElementById("thresholdValue");
 const uploader = document.getElementById("uploader");
 const convertBtn = document.getElementById("convertBtn");
 const statusDiv = document.getElementById("status");
@@ -46,6 +48,8 @@ function debounce(func, wait) {
 uploader.addEventListener("change", fileUploaded, false);
 convertBtn.addEventListener("click", convertImage, false);
 dimensionsEdit.addEventListener("input", debounce(updateGrid, 150), false);
+threshold.addEventListener("input", updateThresholdDisplay, false);
+threshold.addEventListener("input", debounce(updateGrid, 150), false);
 zoomInBtn.addEventListener("click", () => zoomCanvas(1.2));
 zoomOutBtn.addEventListener("click", () => zoomCanvas(0.8));
 resetZoomBtn.addEventListener("click", resetZoom);
