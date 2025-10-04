@@ -141,7 +141,7 @@ function endDrag() {
     draggedCorner = null;
 }
 
-function convertImage() {
+async function convertImage() {
     if (!currentBitmap) {
         statusDiv.textContent = "Please upload an image first.";
         return;
@@ -151,7 +151,7 @@ function convertImage() {
     spinner.start();
     try {
         // Create cropped bitmap based on corners
-        const croppedBitmap = cropToRectangle(currentBitmap, corners);
+        const croppedBitmap = await cropToRectangle(currentBitmap, corners);
         processFile(croppedBitmap);
         statusDiv.textContent = "Processing complete.";
     } catch (err: any) {
@@ -161,7 +161,7 @@ function convertImage() {
     spinner.stop();
 }
 
-function cropToRectangle(bitmap: ImageBitmap, corners: {x: number, y: number}[]): ImageBitmap {
+async function cropToRectangle(bitmap: ImageBitmap, corners: {x: number, y: number}[]): Promise<ImageBitmap> {
     const minX = Math.min(...corners.map(c => c.x));
     const maxX = Math.max(...corners.map(c => c.x));
     const minY = Math.min(...corners.map(c => c.y));
@@ -175,7 +175,7 @@ function cropToRectangle(bitmap: ImageBitmap, corners: {x: number, y: number}[])
     const ctx = canvas.getContext("2d")!;
     ctx.drawImage(bitmap, minX, minY, width, height, 0, 0, width, height);
     
-    return canvas.transferToImageBitmap();
+    return createImageBitmap(canvas);
 }
 
 function processFile(bitmap: ImageBitmap) {
