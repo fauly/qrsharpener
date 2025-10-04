@@ -68,6 +68,23 @@
             input[type="file"]:hover {
                 background: #edf2f7;
             }
+            button {
+                padding: 12px 24px;
+                background: #3182ce;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                font-size: 1em;
+                cursor: pointer;
+                transition: background 0.3s;
+            }
+            button:hover:not(:disabled) {
+                background: #2c5282;
+            }
+            button:disabled {
+                background: #a0aec0;
+                cursor: not-allowed;
+            }
             .status {
                 text-align: center;
                 font-weight: bold;
@@ -139,6 +156,7 @@
                     <label for="uploader">File:</label>
                     <input id="uploader" type="file" accept="image/*" />
                 </div>
+                <button id="convertBtn" disabled>Convert QR Code</button>
             </div>
             <div id="status" class="status"></div>
             <div class="image-section">
