@@ -136,7 +136,13 @@ function updateGrid() {
     ctx.drawImage(currentBitmap, 0, 0);
 
     const dimensions = parseInt(dimensionsEdit.value);
-    if (dimensions <= 0) {
+    // Validate dimensions (QR codes support up to 177x177, but we'll be conservative)
+    const validDimensions = Math.max(1, Math.min(177, dimensions));
+    if (dimensions !== validDimensions) {
+        dimensionsEdit.value = validDimensions;
+    }
+    
+    if (validDimensions <= 0) {
         ctx.restore();
         updatePreview();
         return;
@@ -154,14 +160,14 @@ function updateGrid() {
     const width = maxX - minX;
     const height = maxY - minY;
 
-    for (let i = 0; i <= dimensions; i++) {
-        const x = minX + (width * i) / dimensions;
+    for (let i = 0; i <= validDimensions; i++) {
+        const x = minX + (width * i) / validDimensions;
         ctx.beginPath();
         ctx.moveTo(x, minY);
         ctx.lineTo(x, maxY);
         ctx.stroke();
 
-        const y = minY + (height * i) / dimensions;
+        const y = minY + (height * i) / validDimensions;
         ctx.beginPath();
         ctx.moveTo(minX, y);
         ctx.lineTo(maxX, y);
@@ -268,7 +274,10 @@ function updatePreview() {
     if (!currentBitmap) return;
     
     const dimensions = parseInt(dimensionsEdit.value);
-    if (dimensions <= 0) return;
+    // Validate dimensions (QR codes support up to 177x177, but we'll be conservative)
+    const validDimensions = Math.max(1, Math.min(177, dimensions));
+    
+    if (validDimensions <= 0) return;
     
     // Create cropped image data based on corners
     const minX = Math.min(...corners.map(c => c.x));
@@ -289,14 +298,14 @@ function updatePreview() {
     const imageData = tempCtx.getImageData(0, 0, cropWidth, cropHeight);
     
     // Generate QR using the same algorithm
-    const sharpener = new QRSharpener(dimensions, 50);
+    const sharpener = new QRSharpener(validDimensions, 50);
     const result = sharpener.sharpen(imageData);
     
     // Display on preview canvas
     const previewCtx = previewCanvas.getContext("2d");
-    const previewImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), dimensions, dimensions);
-    previewCanvas.width = dimensions;
-    previewCanvas.height = dimensions;
+    const previewImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), validDimensions, validDimensions);
+    previewCanvas.width = validDimensions;
+    previewCanvas.height = validDimensions;
     previewCtx.putImageData(previewImageData, 0, 0);
 }
 
@@ -306,12 +315,21 @@ async function convertImage() {
         return;
     }
 
+    const dimensions = parseInt(dimensionsEdit.value);
+    // Validate dimensions (QR codes support up to 177x177, but we'll be conservative)
+    const validDimensions = Math.max(1, Math.min(177, dimensions));
+    
+    if (validDimensions <= 0) {
+        statusDiv.textContent = "Please enter a valid dimension (1-177).";
+        return;
+    }
+
     const spinner = new Spinner(statusDiv);
     spinner.start();
     try {
         // Create cropped bitmap based on corners
         const croppedBitmap = await cropToRectangle(currentBitmap, corners);
-        processFile(croppedBitmap);
+        processFile(croppedBitmap, validDimensions);
         statusDiv.textContent = "Processing complete.";
     } catch (err) {
         console.error(err);
@@ -337,7 +355,7 @@ async function cropToRectangle(bitmap, corners) {
     return createImageBitmap(canvas);
 }
 
-function processFile(bitmap) {
+function processFile(bitmap, dimensions) {
 
     canvas.width = bitmap.width;
     canvas.height = bitmap.height;
@@ -345,8 +363,6 @@ function processFile(bitmap) {
     const context = canvas.getContext("2d");
     if (context === null)
         throw new Error("Cannot get 2d canvas context");
-
-    const dimensions = parseInt(dimensionsEdit.value);
 
     context.drawImage(bitmap, 0, 0);
     const data = context.getImageData(0, 0, bitmap.width, bitmap.height);
