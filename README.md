@@ -2,7 +2,7 @@
 
 [![Travis CI](https://travis-ci.org/haraldF/qrsharpener.svg?branch=master)](https://travis-ci.org/haraldF/qrsharpener)
 
-This little utility tries to recreate a QR code from a blurry picture.
+This little utility tries to recreate a QR code from a blurry picture, supporting any QR code dimension (e.g., 29x29 or 66x66).
 
 ## Trying it out
 
@@ -17,7 +17,7 @@ npx ts-node ./sharpener.ts <image.jpg>
 
 Pass your jpeg image as only parameter to `sharpener.ts`. This will output two files, `res.jpg` with the detected QR code and `res_annotated.jpg` with the annotated original image. The annotated image contains one red dot showing where this tool thinks the center of each block is. If the red dots are off, use an image manipulation program to crop/transform the image.
 
-For QR codes of other dimensions than 29x29, please edit `sharpener.ts` and set the `dimension` variable. You can also play with `colorThreshold` which tells the tool which RGB threshold to consider white or black.
+For QR codes of other dimensions than 29x29, set the `dimension` variable in the code or use the web interface to specify the dimension. You can also play with `colorThreshold` which tells the tool which RGB threshold to consider white or black.
 
 ## Usage in a browser
 
