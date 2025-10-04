@@ -49,6 +49,9 @@ function updateThresholdDisplay() {
     thresholdValue.textContent = threshold.value;
 }
 
+// Initialize threshold display
+updateThresholdDisplay();
+
 uploader.addEventListener("change", fileUploaded, false);
 convertBtn.addEventListener("click", convertImage, false);
 dimensionsEdit.addEventListener("input", debounce(updateGrid, 150), false);
