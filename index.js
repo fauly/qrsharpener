@@ -1,3 +1,4 @@
+import jsQR from "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.es6.min.js";
 import { QRSharpener } from "./QRSharpener.js";
 
 const annotatedImage = document.getElementById("annotatedImage");
@@ -27,6 +28,9 @@ const overlayOpacity = document.getElementById("overlayOpacity");
 const opacityValue = document.getElementById("opacityValue");
 const toggleCorrection = document.getElementById("toggleCorrection");
 const exportCorrected = document.getElementById("exportCorrected");
+const decodedOutput = document.getElementById("decodedOutput");
+const decodedStatus = document.getElementById("decodedStatus");
+const essentialHints = document.getElementById("essentialHints");
 
 let currentBitmap = null;
 let corners = [];
@@ -630,7 +634,7 @@ async function convertImage() {
 
 async function cropToRectangle(bitmap, corners) {
     const minX = Math.min(...corners.map(c => c.x));
-    const maxX = Math.max(...corners.map(c => c.x));
+    const maxX = Math.max(...corners.map c => c.x));
     const minY = Math.min(...corners.map(c => c.y));
     const maxY = Math.max(...corners.map(c => c.y));
 
@@ -959,4 +963,37 @@ function updateResultImage() {
     const dimensions = parseInt(correctionCanvas.dataset.dimensions);
     const correctedImageData = new ImageData(correctedQRBuffer.slice(), dimensions, dimensions);
     renderResult(correctedImageData, resultImage);
+}
+
+function updateDecodedOutput(buffer, dimension, contextLabel = "Preview", fallbackImageData = null) {
+    if (!decodedOutput || !decodedStatus || !buffer) {
+        return;
+    }
+
+    try {
+        const binaryData = new ImageData(Uint8ClampedArray.from(buffer), dimension, dimension);
+        let decoded = jsQR(binaryData.data, dimension, dimension, {
+            inversionAttempts: "attemptBoth",
+            greyScaleWeights: { r: 0.2126, g: 0.7152, b: 0.0722 },
+            canOverwriteImage: true
+        });
+
+        if (!decoded && fallbackImageData) {
+            decoded = jsQR(fallbackImageData.data, fallbackImageData.width, fallbackImageData.height, {
+                inversionAttempts: "attemptBoth",
+                greyScaleWeights: { r: 0.299, g: 0.587, b: 0.114 },
+                canOverwriteImage: false
+            });
+        }
+
+        if (decoded) {
+            decodedOutput.textContent = decoded.data || "(QR decoded but no payload)";
+            decodedStatus.textContent = `✅ Decoded from ${contextLabel}${decoded.version ? ` • Version ${decoded.version}` : ""}`;
+        } else {
+            decodedStatus.textContent = `⏳ No valid QR detected yet from ${contextLabel}. Keep refining…`;
+        }
+    } catch (err) {
+        console.warn("Decoder error", err);
+        decodedStatus.textContent = `⚠️ Decoder error (${contextLabel}): ${err.message}`;
+    }
 }

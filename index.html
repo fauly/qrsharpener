@@ -241,6 +241,33 @@
                 height: 200px;
                 image-rendering: pixelated;
             }
+            .decoded-output {
+                margin-top: 10px;
+                background: #f1f5f9;
+                border-radius: 6px;
+                padding: 10px;
+                box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
+                text-align: left;
+            }
+            .decoded-output h5 {
+                margin: 0 0 6px 0;
+                font-size: 0.95em;
+                color: #2d3748;
+            }
+            #decodedOutput {
+                margin: 0;
+                white-space: pre-wrap;
+                font-family: "Fira Code", monospace;
+                font-size: 0.9em;
+                color: #1a202c;
+                max-height: 120px;
+                overflow-y: auto;
+            }
+            .decoded-status {
+                margin-top: 6px;
+                font-size: 0.85em;
+                color: #805ad5;
+            }
         </style>
     </head>
     <body>
@@ -306,6 +333,11 @@
                     <div class="preview-wrapper">
                         <h4>Live QR Preview</h4>
                         <canvas id="previewCanvas"></canvas>
+                        <div class="decoded-output">
+                            <h5>Decoded Data</h5>
+                            <pre id="decodedOutput">Waiting for data...</pre>
+                            <div id="decodedStatus" class="decoded-status"></div>
+                        </div>
                     </div>
                 </div>
                 
@@ -332,6 +364,7 @@
                     <button id="exportCorrected">Export Corrected QR</button>
                     <button id="resetCorrection">Reset to Original</button>
                 </div>
+                <div id="essentialHints" style="margin-bottom: 15px; color: #4a5568; font-size: 0.95em;"></div>
                 <div class="image-container" style="margin: 0;">
                     <div class="image-wrapper">
                         <canvas id="correctionCanvas" style="max-width: 100%; border: 1px solid #ccc;"></canvas>
