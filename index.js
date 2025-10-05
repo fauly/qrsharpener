@@ -85,6 +85,34 @@ function applyFilters() {
     
     // Update the grid and preview with filtered image
     updateGrid();
+    updatePreview();
+}
+
+function getFilteredImageData() {
+    if (!currentBitmap) return null;
+    
+    // Create a temporary canvas with the same filters applied
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = currentBitmap.width;
+    tempCanvas.height = currentBitmap.height;
+    const tempCtx = tempCanvas.getContext("2d");
+    
+    // Apply the same filters to the temp canvas
+    const brightnessVal = brightness.value / 100;
+    const contrastVal = contrast.value / 100;
+    const saturationVal = saturation.value / 100;
+    const sharpnessVal = sharpness.value / 100;
+    
+    let filterString = `brightness(${brightnessVal}) contrast(${contrastVal}) saturate(${saturationVal})`;
+    if (sharpnessVal > 0) {
+        const sharpnessContrast = 1 + (sharpnessVal * 0.5);
+        filterString += ` contrast(${sharpnessContrast})`;
+    }
+    
+    tempCtx.filter = filterString;
+    tempCtx.drawImage(currentBitmap, 0, 0);
+    
+    return tempCtx.getImageData(0, 0, currentBitmap.width, currentBitmap.height);
 }
 
 function resetAllFilters() {
@@ -500,13 +528,17 @@ function updatePreview() {
     
     if (validDimensions <= 0) return;
     
-    // Get image data from the full bitmap (not cropped)
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = currentBitmap.width;
-    tempCanvas.height = currentBitmap.height;
-    const tempCtx = tempCanvas.getContext("2d");
-    tempCtx.drawImage(currentBitmap, 0, 0);
-    const imageData = tempCtx.getImageData(0, 0, currentBitmap.width, currentBitmap.height);
+    // Get filtered image data for preview
+    const imageData = getFilteredImageData();
+    if (!imageData) {
+        // Fallback to original bitmap if filtering fails
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = currentBitmap.width;
+        tempCanvas.height = currentBitmap.height;
+        const tempCtx = tempCanvas.getContext("2d");
+        tempCtx.drawImage(currentBitmap, 0, 0);
+        imageData = tempCtx.getImageData(0, 0, currentBitmap.width, currentBitmap.height);
+    }
     
     // Generate QR using perspective-correct sampling
     const sharpener = new QRSharpener(validDimensions, parseInt(threshold.value));
@@ -566,21 +598,39 @@ async function cropToRectangle(bitmap, corners) {
 }
 
 function processFile(bitmap, dimensions, corners) {
+    // Get filtered image data for processing
+    const filteredData = getFilteredImageData();
+    const imageData = filteredData || (() => {
+        // Fallback to original bitmap if filtering fails
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const context = canvas.getContext("2d");
+        if (context === null)
+            throw new Error("Cannot get 2d canvas context");
+        context.drawImage(bitmap, 0, 0);
+        return context.getImageData(0, 0, bitmap.width, bitmap.height);
+    })();
 
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-
+    canvas.width = imageData.width;
+    canvas.height = imageData.height;
     const context = canvas.getContext("2d");
     if (context === null)
         throw new Error("Cannot get 2d canvas context");
-
-    context.drawImage(bitmap, 0, 0);
-    const data = context.getImageData(0, 0, bitmap.width, bitmap.height);
+    context.putImageData(imageData, 0, 0);
 
     const sharpener = new QRSharpener(dimensions, parseInt(threshold.value));
-    const result = sharpener.sharpen(data, corners);
+    const result = sharpener.sharpen(imageData, corners);
 
-    // Create cropped image for display
+    // Create cropped image for display (use filtered bitmap for consistency)
+    const displayBitmap = filteredData ? (() => {
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = filteredData.width;
+        tempCanvas.height = filteredData.height;
+        const tempCtx = tempCanvas.getContext("2d");
+        tempCtx.putImageData(filteredData, 0, 0);
+        return tempCanvas;
+    })() : bitmap;
+
     const minX = Math.min(...corners.map(c => c.x));
     const maxX = Math.max(...corners.map(c => c.x));
     const minY = Math.min(...corners.map(c => c.y));
@@ -593,10 +643,8 @@ function processFile(bitmap, dimensions, corners) {
     cropCanvas.width = cropWidth;
     cropCanvas.height = cropHeight;
     const cropCtx = cropCanvas.getContext("2d");
-    cropCtx.drawImage(bitmap, minX, minY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    cropCtx.drawImage(displayBitmap, minX, minY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
     croppedImage.src = cropCanvas.toDataURL();
-
-    // Create annotated image from the cropped portion of the annotated buffer
     const annotatedCanvas = document.createElement("canvas");
     annotatedCanvas.width = cropWidth;
     annotatedCanvas.height = cropHeight;
@@ -606,7 +654,7 @@ function processFile(bitmap, dimensions, corners) {
     const croppedAnnotatedData = annotatedCtx.createImageData(cropWidth, cropHeight);
     for (let y = 0; y < cropHeight; y++) {
         for (let x = 0; x < cropWidth; x++) {
-            const sourceIndex = ((minY + y) * bitmap.width + (minX + x)) * 4;
+            const sourceIndex = ((minY + y) * imageData.width + (minX + x)) * 4;
             const targetIndex = (y * cropWidth + x) * 4;
             
             // Copy RGBA values from the annotated buffer (includes original image + red dots)
@@ -621,7 +669,7 @@ function processFile(bitmap, dimensions, corners) {
     annotatedImage.src = annotatedCanvas.toDataURL();
 
     const resultImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), dimensions, dimensions);
-    const annotatedImageData = new ImageData(Uint8ClampedArray.from(result.annotatedImageBuffer), bitmap.width, bitmap.height);
+    const annotatedImageData = new ImageData(Uint8ClampedArray.from(result.annotatedImageBuffer), imageData.width, imageData.height);
 
     renderResult(resultImageData, resultImage);
 }
