@@ -320,6 +320,24 @@
                     <button id="convertBtn" disabled>Convert QR Code</button>
                 </div>
             </div>
+            <div id="correctionSection" style="display: none; margin-top: 20px; padding: 20px; border: 2px solid #4a5568; border-radius: 10px; background: #f8f9fa;">
+                <h3 style="margin-top: 0; color: #4a5568;">Manual QR Correction</h3>
+                <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 15px;">
+                    <label for="overlayOpacity" style="font-weight: bold;">Overlay Opacity:</label>
+                    <input type="range" id="overlayOpacity" min="0" max="100" value="50" style="flex: 1;">
+                    <span id="opacityValue" style="min-width: 40px;">50%</span>
+                </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button id="toggleCorrection">Toggle Correction Mode</button>
+                    <button id="exportCorrected">Export Corrected QR</button>
+                    <button id="resetCorrection">Reset to Original</button>
+                </div>
+                <div class="image-container" style="margin: 0;">
+                    <div class="image-wrapper">
+                        <canvas id="correctionCanvas" style="max-width: 100%; border: 1px solid #ccc;"></canvas>
+                    </div>
+                </div>
+            </div>
             <div id="status" class="status"></div>
             <div class="image-section">
                 <div class="image-container">

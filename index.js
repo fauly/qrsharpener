@@ -20,13 +20,13 @@ const statusDiv = document.getElementById("status");
 const dimensionsEdit = document.getElementById("dimensions");
 const zoomInBtn = document.getElementById("zoomInBtn");
 const zoomOutBtn = document.getElementById("zoomOutBtn");
-const resetZoomBtn = document.getElementById("resetZoomBtn");
-const zoomLevel = document.getElementById("zoomLevel");
-const editorSection = document.getElementById("editorSection");
-const editorCanvas = document.getElementById("editorCanvas");
-const previewCanvas = document.getElementById("previewCanvas");
-const canvas = document.createElement("canvas");
-const resultCanvas = document.createElement("canvas");
+const resetCorrection = document.getElementById("resetCorrection");
+const correctionSection = document.getElementById("correctionSection");
+const correctionCanvas = document.getElementById("correctionCanvas");
+const overlayOpacity = document.getElementById("overlayOpacity");
+const opacityValue = document.getElementById("opacityValue");
+const toggleCorrection = document.getElementById("toggleCorrection");
+const exportCorrected = document.getElementById("exportCorrected");
 
 let currentBitmap = null;
 let corners = [];
@@ -40,6 +40,12 @@ let isPanning = false;
 let lastPanX = 0;
 let lastPanY = 0;
 let hoveredCorner = null; // Track which corner is being hovered
+
+// Correction mode variables
+let correctionMode = false;
+let originalQRBuffer = null;
+let annotatedImageData = null;
+let correctedQRBuffer = null;
 
 // Debounce function for input fields
 function debounce(func, wait) {
@@ -147,6 +153,24 @@ zoomInBtn.addEventListener("click", () => zoomCanvas(1.2));
 zoomOutBtn.addEventListener("click", () => zoomCanvas(0.8));
 resetZoomBtn.addEventListener("click", resetZoom);
 editorCanvas.addEventListener("wheel", handleWheel, { passive: false });
+
+// Correction interface event listeners
+overlayOpacity.addEventListener("input", () => {
+    opacityValue.textContent = overlayOpacity.value + "%";
+    updateCorrectionCanvas();
+});
+toggleCorrection.addEventListener("click", () => {
+    correctionMode = !correctionMode;
+    toggleCorrection.textContent = correctionMode ? "Exit Correction Mode" : "Toggle Correction Mode";
+    updateCorrectionCanvas();
+});
+correctionCanvas.addEventListener("click", handleCorrectionClick);
+exportCorrected.addEventListener("click", exportCorrectedQR);
+resetCorrection.addEventListener("click", () => {
+    correctedQRBuffer.set(originalQRBuffer);
+    updateCorrectionCanvas();
+    updateResultImage();
+});
 
 // Add mouse event listeners for dragging
 editorCanvas.addEventListener("mousedown", startDrag);
@@ -665,6 +689,14 @@ function processFile(bitmap, dimensions, corners) {
     const resultImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), dimensions, dimensions);
     const annotatedImageData = new ImageData(Uint8ClampedArray.from(result.annotatedImageBuffer), imageData.width, imageData.height);
 
+    // Store data for correction mode
+    originalQRBuffer = new Uint8ClampedArray(result.qrCodeBuffer);
+    correctedQRBuffer = new Uint8ClampedArray(result.qrCodeBuffer);
+    annotatedImageData = annotatedImageData;
+
+    // Show correction interface
+    showCorrectionInterface(dimensions, annotatedImageData, resultImageData);
+
     renderResult(resultImageData, resultImage);
 }
 
@@ -675,4 +707,158 @@ function renderResult(imageData, destination) {
     const context = resultCanvas.getContext('2d');
     context.putImageData(imageData, 0, 0);
     destination.src = resultCanvas.toDataURL();
+}
+
+function showCorrectionInterface(dimensions, annotatedData, qrData) {
+    correctionSection.style.display = 'block';
+    
+    // Set up correction canvas
+    const maxSize = 400;
+    const scale = Math.min(maxSize / Math.max(annotatedData.width, annotatedData.height), 1);
+    correctionCanvas.width = annotatedData.width * scale;
+    correctionCanvas.height = annotatedData.height * scale;
+    
+    // Store scale for coordinate conversion
+    correctionCanvas.dataset.scale = scale;
+    correctionCanvas.dataset.dimensions = dimensions;
+    
+    updateCorrectionCanvas();
+}
+
+function updateCorrectionCanvas() {
+    if (!correctionCanvas.dataset.scale) return;
+    
+    const ctx = correctionCanvas.getContext('2d');
+    const scale = parseFloat(correctionCanvas.dataset.scale);
+    const dimensions = parseInt(correctionCanvas.dataset.dimensions);
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, correctionCanvas.width, correctionCanvas.height);
+    
+    // Draw annotated image as background
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = annotatedImageData.width;
+    tempCanvas.height = annotatedImageData.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.putImageData(annotatedImageData, 0, 0);
+    
+    ctx.drawImage(tempCanvas, 0, 0, annotatedImageData.width, annotatedImageData.height, 
+                  0, 0, correctionCanvas.width, correctionCanvas.height);
+    
+    // Draw QR overlay with opacity
+    const opacity = parseInt(overlayOpacity.value) / 100;
+    ctx.globalAlpha = opacity;
+    
+    const qrCanvas = document.createElement('canvas');
+    qrCanvas.width = dimensions;
+    qrCanvas.height = dimensions;
+    const qrCtx = qrCanvas.getContext('2d');
+    const qrImageData = new ImageData(correctedQRBuffer.slice(), dimensions, dimensions);
+    qrCtx.putImageData(qrImageData, 0, 0);
+    
+    // Scale QR to match annotated image size
+    const qrScale = Math.min(annotatedImageData.width / dimensions, annotatedImageData.height / dimensions);
+    const qrSize = dimensions * qrScale;
+    const qrX = (annotatedImageData.width * scale - qrSize * scale) / 2;
+    const qrY = (annotatedImageData.height * scale - qrSize * scale) / 2;
+    
+    ctx.drawImage(qrCanvas, 0, 0, dimensions, dimensions, qrX, qrY, qrSize * scale, qrSize * scale);
+    
+    ctx.globalAlpha = 1.0;
+    
+    // Draw grid lines if in correction mode
+    if (correctionMode) {
+        ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+        ctx.lineWidth = 1;
+        
+        const cellSize = qrSize * scale / dimensions;
+        const startX = qrX;
+        const startY = qrY;
+        
+        for (let i = 0; i <= dimensions; i++) {
+            // Vertical lines
+            ctx.beginPath();
+            ctx.moveTo(startX + i * cellSize, startY);
+            ctx.lineTo(startX + i * cellSize, startY + qrSize * scale);
+            ctx.stroke();
+            
+            // Horizontal lines
+            ctx.beginPath();
+            ctx.moveTo(startX, startY + i * cellSize);
+            ctx.lineTo(startX + qrSize * scale, startY + i * cellSize);
+            ctx.stroke();
+        }
+    }
+}
+
+function handleCorrectionClick(e) {
+    if (!correctionMode || !correctedQRBuffer) return;
+    
+    const rect = correctionCanvas.getBoundingClientRect();
+    const scale = parseFloat(correctionCanvas.dataset.scale);
+    const dimensions = parseInt(correctionCanvas.dataset.dimensions);
+    
+    // Convert click coordinates to canvas coordinates
+    const canvasX = (e.clientX - rect.left) * (correctionCanvas.width / rect.width);
+    const canvasY = (e.clientY - rect.top) * (correctionCanvas.height / rect.height);
+    
+    // Convert to annotated image coordinates
+    const imageX = canvasX / scale;
+    const imageY = canvasY / scale;
+    
+    // Calculate QR overlay position and size
+    const qrScale = Math.min(annotatedImageData.width / dimensions, annotatedImageData.height / dimensions);
+    const qrSize = dimensions * qrScale;
+    const qrX = (annotatedImageData.width - qrSize) / 2;
+    const qrY = (annotatedImageData.height - qrSize) / 2;
+    
+    // Check if click is within QR area
+    if (imageX >= qrX && imageX < qrX + qrSize && imageY >= qrY && imageY < qrY + qrSize) {
+        // Convert to QR grid coordinates
+        const gridX = Math.floor((imageX - qrX) / qrScale);
+        const gridY = Math.floor((imageY - qrY) / qrScale);
+        
+        // Toggle the pixel (black <-> white)
+        const index = (gridY * dimensions + gridX) * 4;
+        const isBlack = correctedQRBuffer[index] === 0;
+        
+        if (isBlack) {
+            // Make white
+            correctedQRBuffer[index] = 255;     // R
+            correctedQRBuffer[index + 1] = 255; // G
+            correctedQRBuffer[index + 2] = 255; // B
+            correctedQRBuffer[index + 3] = 255; // A
+        } else {
+            // Make black
+            correctedQRBuffer[index] = 0;       // R
+            correctedQRBuffer[index + 1] = 0;   // G
+            correctedQRBuffer[index + 2] = 0;   // B
+            correctedQRBuffer[index + 3] = 255; // A
+        }
+        
+        updateCorrectionCanvas();
+        updateResultImage();
+    }
+}
+
+function exportCorrectedQR() {
+    if (!correctedQRBuffer) return;
+    
+    const dimensions = parseInt(correctionCanvas.dataset.dimensions);
+    const correctedImageData = new ImageData(correctedQRBuffer.slice(), dimensions, dimensions);
+    renderResult(correctedImageData, resultImage);
+    
+    // Optionally download the image
+    const link = document.createElement('a');
+    link.download = 'corrected-qr.png';
+    link.href = resultImage.src;
+    link.click();
+}
+
+function updateResultImage() {
+    if (!correctedQRBuffer) return;
+    
+    const dimensions = parseInt(correctionCanvas.dataset.dimensions);
+    const correctedImageData = new ImageData(correctedQRBuffer.slice(), dimensions, dimensions);
+    renderResult(correctedImageData, resultImage);
 }
