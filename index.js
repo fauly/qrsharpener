@@ -178,8 +178,21 @@ editorCanvas.addEventListener("mousemove", (e) => {
     checkHover(e);
     drag(e);
 });
-editorCanvas.addEventListener("mouseup", () => { draggedCorner = null; isPanning = false; });
-editorCanvas.addEventListener("mouseleave", () => { draggedCorner = null; isPanning = false; hoveredCorner = null; updateGrid(); });
+editorCanvas.addEventListener("mouseup", (e) => { 
+    draggedCorner = null; 
+    isPanning = false; 
+    // Reset cursor
+    editorCanvas.style.cursor = 'grab';
+});
+editorCanvas.addEventListener("mouseleave", () => { 
+    draggedCorner = null; 
+    isPanning = false; 
+    hoveredCorner = null; 
+    editorCanvas.style.cursor = 'default';
+    updateGrid(); 
+});
+// Prevent context menu on right-click for better UX
+editorCanvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
 class Spinner {
     constructor(target) {
@@ -365,6 +378,13 @@ function checkHover(e) {
         hoveredCorner = null;
     }
     
+    // Update cursor based on what's being hovered
+    if (foundHover) {
+        editorCanvas.style.cursor = 'pointer';
+    } else {
+        editorCanvas.style.cursor = isPanning ? 'grabbing' : 'grab';
+    }
+    
     updateGrid();
 }
 
@@ -463,6 +483,7 @@ function startDrag(e) {
     const imageX = (canvasX - panX) / zoom;
     const imageY = (canvasY - panY) / zoom;
 
+    // Check for corner handles first
     let foundCorner = false;
     corners.forEach((corner, index) => {
         const handleSize = Math.max(6, 12 / zoom); // Smaller handles: minimum 6 pixels, scales with zoom
@@ -474,11 +495,14 @@ function startDrag(e) {
         }
     });
     
-    if (!foundCorner) {
-        // Start panning
+    // If no corner found, or if middle mouse button is pressed, start panning
+    if (!foundCorner || e.button === 1) { // Middle mouse button
         isPanning = true;
         lastPanX = e.clientX;
         lastPanY = e.clientY;
+        editorCanvas.style.cursor = 'grabbing';
+        // Prevent default middle-click behavior
+        e.preventDefault();
     }
 }
 
