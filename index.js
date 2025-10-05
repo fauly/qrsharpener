@@ -645,45 +645,99 @@ function processFile(bitmap, dimensions, corners) {
     const sharpener = new QRSharpener(dimensions, parseInt(threshold.value));
     const result = sharpener.sharpen(imageData, corners);
 
-    // Create cropped image for display (use filtered bitmap for consistency)
-    const displayBitmap = filteredData ? (() => {
-        const tempCanvas = document.createElement("canvas");
-        tempCanvas.width = filteredData.width;
-        tempCanvas.height = filteredData.height;
-        const tempCtx = tempCanvas.getContext("2d");
-        tempCtx.putImageData(filteredData, 0, 0);
-        return tempCanvas;
-    })() : bitmap;
+    // Create perspective-corrected cropped image
+    const correctedCropCanvas = document.createElement("canvas");
+    correctedCropCanvas.width = dimensions;
+    correctedCropCanvas.height = dimensions;
+    const correctedCropCtx = correctedCropCanvas.getContext("2d");
+    
+    // Create corrected image data by sampling with perspective correction
+    const correctedImageData = correctedCropCtx.createImageData(dimensions, dimensions);
+    
+    // corners should be [topLeft, topRight, bottomRight, bottomLeft]
+    const topLeft = corners[0];
+    const topRight = corners[1];
+    const bottomRight = corners[2];
+    const bottomLeft = corners[3];
 
-    const minX = Math.min(...corners.map(c => c.x));
-    const maxX = Math.max(...corners.map(c => c.x));
-    const minY = Math.min(...corners.map(c => c.y));
-    const maxY = Math.max(...corners.map(c => c.y));
+    for (let y = 0; y < dimensions; ++y) {
+        for (let x = 0; x < dimensions; ++x) {
+            // Map grid position to quadrilateral position using bilinear interpolation
+            const t_x = x / (dimensions - 1); // Use full range for corners
+            const t_y = y / (dimensions - 1);
 
-    // Clamp crop region to image bounds
-    const clampedMinX = Math.max(0, minX);
-    const clampedMaxX = Math.min(displayBitmap.width, maxX);
-    const clampedMinY = Math.max(0, minY);
-    const clampedMaxY = Math.min(displayBitmap.height, maxY);
+            // Interpolate along top and bottom edges
+            const topX = topLeft.x + t_x * (topRight.x - topLeft.x);
+            const topY = topLeft.y + t_x * (topRight.y - topLeft.y);
+            const bottomX = bottomLeft.x + t_x * (bottomRight.x - bottomLeft.x);
+            const bottomY = bottomLeft.y + t_x * (bottomRight.y - bottomLeft.y);
 
-    const cropWidth = Math.max(1, clampedMaxX - clampedMinX);
-    const cropHeight = Math.max(1, clampedMaxY - clampedMinY);
+            // Interpolate between top and bottom
+            const sampleX = topX + t_y * (bottomX - topX);
+            const sampleY = topY + t_y * (bottomY - topY);
 
-    const cropCanvas = document.createElement("canvas");
-    cropCanvas.width = cropWidth;
-    cropCanvas.height = cropHeight;
-    const cropCtx = cropCanvas.getContext("2d");
-    cropCtx.drawImage(displayBitmap, clampedMinX, clampedMinY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
-    croppedImage.src = cropCanvas.toDataURL();
-    // Create annotated image - show the full image with sampling dots
+            // Sample the pixel at this position
+            const nx = Math.round(sampleX);
+            const ny = Math.round(sampleY);
+
+            // Clamp to image bounds
+            const clampedNx = Math.max(0, Math.min(imageData.width - 1, nx));
+            const clampedNy = Math.max(0, Math.min(imageData.height - 1, ny));
+
+            let pixelIndex = ((clampedNy * imageData.width) + clampedNx) * 4;
+            const pixels = Array.from(imageData.data.slice(pixelIndex, pixelIndex + 4));
+
+            // Copy the actual pixel colors (not binary)
+            const targetIndex = (y * dimensions + x) * 4;
+            correctedImageData.data[targetIndex] = pixels[0];     // R
+            correctedImageData.data[targetIndex + 1] = pixels[1]; // G
+            correctedImageData.data[targetIndex + 2] = pixels[2]; // B
+            correctedImageData.data[targetIndex + 3] = pixels[3]; // A
+        }
+    }
+    
+    correctedCropCtx.putImageData(correctedImageData, 0, 0);
+    croppedImage.src = correctedCropCanvas.toDataURL();
+    // Create annotated image - corrected crop with sampling dots
     const annotatedCanvas = document.createElement("canvas");
-    annotatedCanvas.width = imageData.width;
-    annotatedCanvas.height = imageData.height;
+    annotatedCanvas.width = dimensions;
+    annotatedCanvas.height = dimensions;
     const annotatedCtx = annotatedCanvas.getContext("2d");
+    
+    // Start with the corrected cropped image
+    annotatedCtx.putImageData(correctedImageData, 0, 0);
+    
+    // Overlay red dots at sampling positions (same as QR algorithm)
+    annotatedCtx.fillStyle = 'red';
+    for (let y = 0; y < dimensions; ++y) {
+        for (let x = 0; x < dimensions; ++x) {
+            // Calculate the same sampling position as the QR algorithm
+            const t_x = (x + 0.5) / dimensions;
+            const t_y = (y + 0.5) / dimensions;
 
-    // Create image data from the full annotated buffer
-    const fullAnnotatedData = new ImageData(Uint8ClampedArray.from(result.annotatedImageBuffer), imageData.width, imageData.height);
-    annotatedCtx.putImageData(fullAnnotatedData, 0, 0);
+            // Interpolate along top and bottom edges
+            const topX = topLeft.x + t_x * (topRight.x - topLeft.x);
+            const topY = topLeft.y + t_x * (topRight.y - topLeft.y);
+            const bottomX = bottomLeft.x + t_x * (bottomRight.x - bottomLeft.x);
+            const bottomY = bottomLeft.y + t_x * (bottomRight.y - bottomLeft.y);
+
+            // Interpolate between top and bottom
+            const sampleX = topX + t_y * (bottomX - topX);
+            const sampleY = topY + t_y * (bottomY - topY);
+
+            // Draw red dot at sampling position (scaled to canvas)
+            const canvasX = (sampleX / imageData.width) * dimensions;
+            const canvasY = (sampleY / imageData.height) * dimensions;
+            
+            // Only draw if within bounds
+            if (canvasX >= 0 && canvasX < dimensions && canvasY >= 0 && canvasY < dimensions) {
+                annotatedCtx.beginPath();
+                annotatedCtx.arc(canvasX, canvasY, 1, 0, 2 * Math.PI);
+                annotatedCtx.fill();
+            }
+        }
+    }
+    
     annotatedImage.src = annotatedCanvas.toDataURL();
 
     const resultImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), dimensions, dimensions);
