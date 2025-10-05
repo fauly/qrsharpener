@@ -746,10 +746,9 @@ function processFile(bitmap, dimensions, corners) {
     // Store data for correction mode
     originalQRBuffer = new Uint8ClampedArray(result.qrCodeBuffer);
     correctedQRBuffer = new Uint8ClampedArray(result.qrCodeBuffer);
-    annotatedImageData = annotatedImageData;
 
     // Show correction interface
-    showCorrectionInterface(dimensions, annotatedImageData, resultImageData);
+    showCorrectionInterface(dimensions, correctedImageData, resultImageData);
 
     renderResult(resultImageData, resultImage);
 }
@@ -777,24 +776,67 @@ function showCorrectionInterface(dimensions, annotatedData, qrData) {
 }
 
 function updateCorrectionCanvas() {
-    if (!correctionCanvas.dataset.scale) return;
+    if (!correctionCanvas.dataset.dimensions) return;
     
     const ctx = correctionCanvas.getContext('2d');
-    const scale = parseFloat(correctionCanvas.dataset.scale);
     const dimensions = parseInt(correctionCanvas.dataset.dimensions);
     
     // Clear canvas
     ctx.clearRect(0, 0, correctionCanvas.width, correctionCanvas.height);
     
-    // Draw annotated image as background
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = annotatedImageData.width;
-    tempCanvas.height = annotatedImageData.height;
-    const tempCtx = tempCanvas.getContext('2d');
-    tempCtx.putImageData(annotatedImageData, 0, 0);
+    // Draw corrected cropped image as background
+    const correctedCanvas = document.createElement('canvas');
+    correctedCanvas.width = dimensions;
+    correctedCanvas.height = dimensions;
+    const correctedCtx = correctedCanvas.getContext('2d');
     
-    ctx.drawImage(tempCanvas, 0, 0, annotatedImageData.width, annotatedImageData.height, 
-                  0, 0, correctionCanvas.width, correctionCanvas.height);
+    // Recreate the corrected image data (same logic as in processFile)
+    const correctedImageData = correctedCtx.createImageData(dimensions, dimensions);
+    const imageData = getFilteredImageData() || (() => {
+        canvas.width = currentBitmap.width;
+        canvas.height = currentBitmap.height;
+        const context = canvas.getContext("2d");
+        context.drawImage(currentBitmap, 0, 0);
+        return context.getImageData(0, 0, currentBitmap.width, currentBitmap.height);
+    })();
+    
+    const topLeft = corners[0];
+    const topRight = corners[1];
+    const bottomRight = corners[2];
+    const bottomLeft = corners[3];
+
+    for (let y = 0; y < dimensions; ++y) {
+        for (let x = 0; x < dimensions; ++x) {
+            const t_x = x / (dimensions - 1);
+            const t_y = y / (dimensions - 1);
+
+            const topX = topLeft.x + t_x * (topRight.x - topLeft.x);
+            const topY = topLeft.y + t_x * (topRight.y - topLeft.y);
+            const bottomX = bottomLeft.x + t_x * (bottomRight.x - bottomLeft.x);
+            const bottomY = bottomLeft.y + t_x * (bottomRight.y - bottomLeft.y);
+
+            const sampleX = topX + t_y * (bottomX - topX);
+            const sampleY = topY + t_y * (bottomY - topY);
+
+            const nx = Math.round(sampleX);
+            const ny = Math.round(sampleY);
+
+            const clampedNx = Math.max(0, Math.min(imageData.width - 1, nx));
+            const clampedNy = Math.max(0, Math.min(imageData.height - 1, ny));
+
+            let pixelIndex = ((clampedNy * imageData.width) + clampedNx) * 4;
+            const pixels = Array.from(imageData.data.slice(pixelIndex, pixelIndex + 4));
+
+            const targetIndex = (y * dimensions + x) * 4;
+            correctedImageData.data[targetIndex] = pixels[0];
+            correctedImageData.data[targetIndex + 1] = pixels[1];
+            correctedImageData.data[targetIndex + 2] = pixels[2];
+            correctedImageData.data[targetIndex + 3] = pixels[3];
+        }
+    }
+    
+    correctedCtx.putImageData(correctedImageData, 0, 0);
+    ctx.drawImage(correctedCanvas, 0, 0, dimensions, dimensions, 0, 0, correctionCanvas.width, correctionCanvas.height);
     
     // Draw QR overlay with opacity
     const opacity = parseInt(overlayOpacity.value) / 100;
@@ -807,13 +849,7 @@ function updateCorrectionCanvas() {
     const qrImageData = new ImageData(correctedQRBuffer.slice(), dimensions, dimensions);
     qrCtx.putImageData(qrImageData, 0, 0);
     
-    // Scale QR to match annotated image size
-    const qrScale = Math.min(annotatedImageData.width / dimensions, annotatedImageData.height / dimensions);
-    const qrSize = dimensions * qrScale;
-    const qrX = (annotatedImageData.width * scale - qrSize * scale) / 2;
-    const qrY = (annotatedImageData.height * scale - qrSize * scale) / 2;
-    
-    ctx.drawImage(qrCanvas, 0, 0, dimensions, dimensions, qrX, qrY, qrSize * scale, qrSize * scale);
+    ctx.drawImage(qrCanvas, 0, 0, dimensions, dimensions, 0, 0, correctionCanvas.width, correctionCanvas.height);
     
     ctx.globalAlpha = 1.0;
     
@@ -822,21 +858,19 @@ function updateCorrectionCanvas() {
         ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)';
         ctx.lineWidth = 1;
         
-        const cellSize = qrSize * scale / dimensions;
-        const startX = qrX;
-        const startY = qrY;
+        const cellSize = correctionCanvas.width / dimensions;
         
         for (let i = 0; i <= dimensions; i++) {
             // Vertical lines
             ctx.beginPath();
-            ctx.moveTo(startX + i * cellSize, startY);
-            ctx.lineTo(startX + i * cellSize, startY + qrSize * scale);
+            ctx.moveTo(i * cellSize, 0);
+            ctx.lineTo(i * cellSize, correctionCanvas.height);
             ctx.stroke();
             
             // Horizontal lines
             ctx.beginPath();
-            ctx.moveTo(startX, startY + i * cellSize);
-            ctx.lineTo(startX + qrSize * scale, startY + i * cellSize);
+            ctx.moveTo(0, i * cellSize);
+            ctx.lineTo(correctionCanvas.width, i * cellSize);
             ctx.stroke();
         }
     }
@@ -846,29 +880,18 @@ function handleCorrectionClick(e) {
     if (!correctionMode || !correctedQRBuffer) return;
     
     const rect = correctionCanvas.getBoundingClientRect();
-    const scale = parseFloat(correctionCanvas.dataset.scale);
     const dimensions = parseInt(correctionCanvas.dataset.dimensions);
     
     // Convert click coordinates to canvas coordinates
     const canvasX = (e.clientX - rect.left) * (correctionCanvas.width / rect.width);
     const canvasY = (e.clientY - rect.top) * (correctionCanvas.height / rect.height);
     
-    // Convert to annotated image coordinates
-    const imageX = canvasX / scale;
-    const imageY = canvasY / scale;
+    // Convert to grid coordinates
+    const gridX = Math.floor((canvasX / correctionCanvas.width) * dimensions);
+    const gridY = Math.floor((canvasY / correctionCanvas.height) * dimensions);
     
-    // Calculate QR overlay position and size
-    const qrScale = Math.min(annotatedImageData.width / dimensions, annotatedImageData.height / dimensions);
-    const qrSize = dimensions * qrScale;
-    const qrX = (annotatedImageData.width - qrSize) / 2;
-    const qrY = (annotatedImageData.height - qrSize) / 2;
-    
-    // Check if click is within QR area
-    if (imageX >= qrX && imageX < qrX + qrSize && imageY >= qrY && imageY < qrY + qrSize) {
-        // Convert to QR grid coordinates
-        const gridX = Math.floor((imageX - qrX) / qrScale);
-        const gridY = Math.floor((imageY - qrY) / qrScale);
-        
+    // Ensure coordinates are within bounds
+    if (gridX >= 0 && gridX < dimensions && gridY >= 0 && gridY < dimensions) {
         // Toggle the pixel (black <-> white)
         const index = (gridY * dimensions + gridX) * 4;
         const isBlack = correctedQRBuffer[index] === 0;
