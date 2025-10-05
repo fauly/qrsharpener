@@ -766,14 +766,11 @@ function renderResult(imageData, destination) {
 function showCorrectionInterface(dimensions, annotatedData, qrData) {
     correctionSection.style.display = 'block';
     
-    // Set up correction canvas
-    const maxSize = 400;
-    const scale = Math.min(maxSize / Math.max(annotatedData.width, annotatedData.height), 1);
-    correctionCanvas.width = annotatedData.width * scale;
-    correctionCanvas.height = annotatedData.height * scale;
+    // Set up correction canvas - use the corrected dimensions
+    correctionCanvas.width = dimensions;
+    correctionCanvas.height = dimensions;
     
-    // Store scale for coordinate conversion
-    correctionCanvas.dataset.scale = scale;
+    // Store dimensions for coordinate conversion
     correctionCanvas.dataset.dimensions = dimensions;
     
     updateCorrectionCanvas();
