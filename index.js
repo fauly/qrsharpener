@@ -1,4 +1,4 @@
-import jsQR from "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.es6.min.js";
+import jsQR from "jsqr";
 import { QRSharpener } from "./QRSharpener.js";
 
 const resultImage = document.getElementById("resultImage");

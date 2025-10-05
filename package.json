@@ -11,7 +11,8 @@
   "author": "Harald Fernengel <harryf@gmx.com>",
   "license": "ISC",
   "dependencies": {
-    "jpeg-js": "^0.3.4"
+    "jpeg-js": "^0.3.4",
+    "jsqr": "^1.4.0"
   },
   "devDependencies": {
     "@types/chai": "^4.1.7",
