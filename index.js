@@ -1,5 +1,4 @@
-import jsQR from "jsqr";
-import { QRSharpener } from "./QRSharpener.js";
+import { QRSharpener } from "./QRSharpener";
 
 const resultImage = document.getElementById("resultImage");
 const croppedImage = document.getElementById("croppedImage");
@@ -20,6 +19,7 @@ const statusDiv = document.getElementById("status");
 const dimensionsEdit = document.getElementById("dimensions");
 const zoomInBtn = document.getElementById("zoomInBtn");
 const zoomOutBtn = document.getElementById("zoomOutBtn");
+const resetZoomBtn = document.getElementById("resetZoomBtn");
 const resetCorrection = document.getElementById("resetCorrection");
 const correctionSection = document.getElementById("correctionSection");
 const correctionCanvas = document.getElementById("correctionCanvas");
@@ -37,6 +37,11 @@ const previewCanvas = document.getElementById("previewCanvas");
 const canvas = document.createElement("canvas");
 const resultCanvas = document.createElement("canvas");
 
+// Helper function to get optimized 2D context
+function getOptimizedContext(canvas) {
+    return canvas.getContext('2d', { willReadFrequently: true });
+}
+
 let currentBitmap = null;
 let corners = [];
 let draggedCorner = null;
@@ -49,6 +54,7 @@ let isPanning = false;
 let lastPanX = 0;
 let lastPanY = 0;
 let hoveredCorner = null; // Track which corner is being hovered
+let currentFilter = 'none';
 
 // Correction mode variables
 let correctionMode = false;
@@ -96,7 +102,8 @@ function applyFilters() {
         filterString += ` contrast(${sharpnessContrast})`;
     }
     
-    editorCanvas.style.filter = filterString;
+    // Apply CSS filters to the canvas context for drawing
+    currentFilter = filterString;
     
     // Update the grid and preview with filtered image
     updateGrid();
@@ -106,28 +113,33 @@ function applyFilters() {
 function getFilteredImageData() {
     if (!currentBitmap) return null;
     
-    // Create a temporary canvas with the same filters applied
-    const tempCanvas = document.createElement("canvas");
-    tempCanvas.width = currentBitmap.width;
-    tempCanvas.height = currentBitmap.height;
-    const tempCtx = tempCanvas.getContext("2d");
-    
-    // Apply the same filters to the temp canvas
-    const brightnessVal = brightness.value / 100;
-    const contrastVal = contrast.value / 100;
-    const saturationVal = saturation.value / 100;
-    const sharpnessVal = sharpness.value / 100;
-    
-    let filterString = `brightness(${brightnessVal}) contrast(${contrastVal}) saturate(${saturationVal})`;
-    if (sharpnessVal > 0) {
-        const sharpnessContrast = 1 + (sharpnessVal * 0.5);
-        filterString += ` contrast(${sharpnessContrast})`;
+    try {
+        // Create a temporary canvas with the same filters applied
+        const tempCanvas = document.createElement("canvas");
+        tempCanvas.width = currentBitmap.width;
+        tempCanvas.height = currentBitmap.height;
+        const tempCtx = getOptimizedContext(tempCanvas);
+        
+        // Apply the same filters to the temp canvas
+        const brightnessVal = brightness.value / 100;
+        const contrastVal = contrast.value / 100;
+        const saturationVal = saturation.value / 100;
+        const sharpnessVal = sharpness.value / 100;
+        
+        let filterString = `brightness(${brightnessVal}) contrast(${contrastVal}) saturate(${saturationVal})`;
+        if (sharpnessVal > 0) {
+            const sharpnessContrast = 1 + (sharpnessVal * 0.5);
+            filterString += ` contrast(${sharpnessContrast})`;
+        }
+        
+        tempCtx.filter = filterString;
+        tempCtx.drawImage(currentBitmap, 0, 0);
+        
+        return tempCtx.getImageData(0, 0, currentBitmap.width, currentBitmap.height);
+    } catch (error) {
+        console.error('Error getting filtered image data:', error);
+        return null;
     }
-    
-    tempCtx.filter = filterString;
-    tempCtx.drawImage(currentBitmap, 0, 0);
-    
-    return tempCtx.getImageData(0, 0, currentBitmap.width, currentBitmap.height);
 }
 
 function resetAllFilters() {
@@ -136,6 +148,7 @@ function resetAllFilters() {
     saturation.value = 100;
     sharpness.value = 0;
     
+    currentFilter = 'none';
     updateFilterDisplay();
     applyFilters();
 }
@@ -173,6 +186,52 @@ toggleCorrection.addEventListener("click", () => {
     toggleCorrection.textContent = correctionMode ? "Exit Correction Mode" : "Toggle Correction Mode";
     updateCorrectionCanvas();
 });
+// Function to handle clicks on the correction canvas
+function handleCorrectionClick(e) {
+    if (!correctionMode || !currentBitmap) return;
+
+    const rect = correctionCanvas.getBoundingClientRect();
+    const scaleX = correctionCanvas.width / rect.width;
+    const scaleY = correctionCanvas.height / rect.height;
+    const x = Math.floor((e.clientX - rect.left) * scaleX);
+    const y = Math.floor((e.clientY - rect.top) * scaleY);
+    
+    // Make sure we're within bounds
+    if (x >= 0 && x < correctionCanvas.width && y >= 0 && y < correctionCanvas.height) {
+        // Toggle the pixel value in the corrected buffer
+        const index = (y * correctionCanvas.width + x) * 4;
+        correctedQRBuffer[index] = correctedQRBuffer[index] === 0 ? 255 : 0;
+        correctedQRBuffer[index + 1] = correctedQRBuffer[index];
+        correctedQRBuffer[index + 2] = correctedQRBuffer[index];
+        // Alpha stays at 255
+        
+        updateCorrectionCanvas();
+        updateResultImage();
+    }
+}
+
+// Function to export the corrected QR code
+function exportCorrectedQR() {
+    if (!correctedQRBuffer) return;
+
+    // Create a temporary canvas for the export
+    const tempCanvas = document.createElement('canvas');
+    const dimensions = parseInt(dimensionsEdit.value) || 21;
+    tempCanvas.width = dimensions;
+    tempCanvas.height = dimensions;
+    
+    // Draw the corrected buffer to the canvas
+    const ctx = tempCanvas.getContext('2d');
+    const imageData = new ImageData(new Uint8ClampedArray(correctedQRBuffer), dimensions, dimensions);
+    ctx.putImageData(imageData, 0, 0);
+    
+    // Create download link
+    const link = document.createElement('a');
+    link.download = 'corrected-qr.png';
+    link.href = tempCanvas.toDataURL('image/png');
+    link.click();
+}
+
 correctionCanvas.addEventListener("click", handleCorrectionClick);
 exportCorrected.addEventListener("click", exportCorrectedQR);
 resetCorrection.addEventListener("click", () => {
@@ -188,10 +247,14 @@ editorCanvas.addEventListener("mousemove", (e) => {
     drag(e);
 });
 editorCanvas.addEventListener("mouseup", (e) => { 
-    draggedCorner = null; 
-    isPanning = false; 
-    // Reset cursor
-    editorCanvas.style.cursor = 'grab';
+    if (draggedCorner !== null) {
+        draggedCorner = null;
+        editorCanvas.style.cursor = hoveredCorner !== null ? 'pointer' : 'grab';
+    }
+    if (isPanning) {
+        isPanning = false;
+        editorCanvas.style.cursor = hoveredCorner !== null ? 'pointer' : 'grab';
+    }
 });
 editorCanvas.addEventListener("mouseleave", () => { 
     draggedCorner = null; 
@@ -268,7 +331,7 @@ function showEditor(bitmap) {
 
 function updateGrid() {
     if (!currentBitmap) return;
-    const ctx = editorCanvas.getContext("2d");
+    const ctx = getOptimizedContext(editorCanvas);
     
     // Clear canvas
     ctx.clearRect(0, 0, editorCanvas.width, editorCanvas.height);
@@ -280,10 +343,19 @@ function updateGrid() {
     ctx.translate(panX, panY);
     ctx.scale(zoom, zoom);
     
-    // Draw the image
-    ctx.drawImage(currentBitmap, 0, 0);
+    // Draw the image with filter applied via temp canvas
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = currentBitmap.width;
+    tempCanvas.height = currentBitmap.height;
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCtx.filter = currentFilter;
+    tempCtx.drawImage(currentBitmap, 0, 0);
+    ctx.drawImage(tempCanvas, 0, 0);
+    
+    // Reset filter for grid and handles
+    ctx.filter = 'none';
 
-    const dimensions = parseInt(dimensionsEdit.value);
+    const dimensions = parseInt(dimensionsEdit.value) || 21; // Default to 21 if invalid
     // Validate dimensions (QR codes support up to 177x177, but we'll be conservative)
     const validDimensions = Math.max(1, Math.min(177, dimensions));
     if (dimensions !== validDimensions) {
@@ -339,13 +411,28 @@ function updateGrid() {
         ctx.stroke();
     }
 
-    // Draw corner handles (adjust size for zoom)
+    // Draw corner handles (make them more visible and easier to click)
     ctx.fillStyle = "red";
-    const handleSize = Math.max(4, 8 / zoom); // Smaller handles: minimum 4 pixels in image space
-    corners.forEach(corner => {
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 2 / zoom; // Border thickness
+    const handleSize = Math.max(8, 16 / zoom); // Minimum 8 pixels in image space
+    
+    corners.forEach((corner, index) => {
         ctx.beginPath();
         ctx.arc(corner.x, corner.y, handleSize, 0, 2 * Math.PI);
         ctx.fill();
+        ctx.stroke();
+        
+        // Add visual feedback for hovered corner
+        if (hoveredCorner === index) {
+            ctx.beginPath();
+            ctx.arc(corner.x, corner.y, handleSize * 1.5, 0, 2 * Math.PI);
+            ctx.strokeStyle = "yellow";
+            ctx.lineWidth = 3 / zoom;
+            ctx.stroke();
+            ctx.strokeStyle = "white"; // Reset for next corner
+            ctx.lineWidth = 2 / zoom;
+        }
     });
     
     ctx.restore();
@@ -368,16 +455,16 @@ function checkHover(e) {
     const canvasX = (e.clientX - rect.left) * scaleX;
     const canvasY = (e.clientY - rect.top) * scaleY;
     
-    // Convert to image coordinates
+    // Convert to image coordinates (accounting for pan and zoom transformations)
     const imageX = (canvasX - panX) / zoom;
     const imageY = (canvasY - panY) / zoom;
 
     let foundHover = false;
+    const handleSize = Math.max(10, 20 / zoom); // Handle size in image coordinates
+    
     corners.forEach((corner, index) => {
-        const handleSize = Math.max(6, 12 / zoom);
-        const distX = Math.abs(corner.x - imageX);
-        const distY = Math.abs(corner.y - imageY);
-        if (distX < handleSize && distY < handleSize) {
+        const dist = Math.sqrt(Math.pow(corner.x - imageX, 2) + Math.pow(corner.y - imageY, 2));
+        if (dist < handleSize) {
             hoveredCorner = index;
             foundHover = true;
         }
@@ -481,6 +568,8 @@ function drawMagnifier(ctx, corner) {
 }
 
 function startDrag(e) {
+    if (!currentBitmap) return;
+    
     const rect = editorCanvas.getBoundingClientRect();
     // Scale mouse coordinates to match internal canvas coordinate system
     const scaleX = editorCanvas.width / rect.width;
@@ -488,30 +577,33 @@ function startDrag(e) {
     const canvasX = (e.clientX - rect.left) * scaleX;
     const canvasY = (e.clientY - rect.top) * scaleY;
     
-    // Convert to image coordinates (inverse of ctx.translate(panX, panY); ctx.scale(zoom, zoom))
+    // Convert to image coordinates (accounting for pan and zoom transformations)
     const imageX = (canvasX - panX) / zoom;
     const imageY = (canvasY - panY) / zoom;
 
     // Check for corner handles first
     let foundCorner = false;
+    const handleSize = Math.max(10, 20 / zoom); // Handle size in image coordinates
+    
     corners.forEach((corner, index) => {
-        const handleSize = Math.max(6, 12 / zoom); // Smaller handles: minimum 6 pixels, scales with zoom
-        const distX = Math.abs(corner.x - imageX);
-        const distY = Math.abs(corner.y - imageY);
-        if (distX < handleSize && distY < handleSize) {
+        const dist = Math.sqrt(Math.pow(corner.x - imageX, 2) + Math.pow(corner.y - imageY, 2));
+        if (dist < handleSize) {
             draggedCorner = index;
             foundCorner = true;
+            editorCanvas.style.cursor = 'pointer';
         }
     });
     
-    // If no corner found, or if middle mouse button is pressed, start panning
-    if (!foundCorner || e.button === 1) { // Middle mouse button
+    // If no corner found, start panning (left-click or middle-click)
+    if (!foundCorner) {
         isPanning = true;
         lastPanX = e.clientX;
         lastPanY = e.clientY;
         editorCanvas.style.cursor = 'grabbing';
-        // Prevent default middle-click behavior
-        e.preventDefault();
+        // Prevent default behavior for middle-click
+        if (e.button === 1) {
+            e.preventDefault();
+        }
     }
 }
 
@@ -523,23 +615,28 @@ function drag(e) {
     const scaleY = editorCanvas.height / rect.height;
 
     if (draggedCorner !== null) {
+        // Dragging a corner handle
         const canvasX = (e.clientX - rect.left) * scaleX;
         const canvasY = (e.clientY - rect.top) * scaleY;
         
-        // Convert to image coordinates (inverse of ctx.translate(panX, panY); ctx.scale(zoom, zoom))
+        // Convert to image coordinates (accounting for pan and zoom transformations)
         const imageX = (canvasX - panX) / zoom;
         const imageY = (canvasY - panY) / zoom;
 
-        corners[draggedCorner].x = imageX;
-        corners[draggedCorner].y = imageY;
+        // Clamp corner position to image bounds
+        corners[draggedCorner].x = Math.max(0, Math.min(currentBitmap.width, imageX));
+        corners[draggedCorner].y = Math.max(0, Math.min(currentBitmap.height, imageY));
 
         updateGrid();
     } else if (isPanning) {
         // Pan the view
         const deltaX = e.clientX - lastPanX;
         const deltaY = e.clientY - lastPanY;
+        
+        // Apply scaling factor to match canvas coordinate system
         panX += deltaX * scaleX;
         panY += deltaY * scaleY;
+        
         lastPanX = e.clientX;
         lastPanY = e.clientY;
         updateGrid();
@@ -547,20 +644,37 @@ function drag(e) {
 }
 
 function zoomCanvas(factor) {
+    if (!currentBitmap) return;
+    
+    const oldZoom = zoom;
+    zoom *= factor;
+    zoom = Math.max(0.1, Math.min(10, zoom)); // Limit zoom between 0.1x and 10x
+    
+    // Adjust pan to zoom towards center of canvas
     const centerX = editorCanvas.width / 2;
     const centerY = editorCanvas.height / 2;
     
-    zoom *= factor;
-    zoom = Math.max(0.1, Math.min(10, zoom)); // Limit zoom between 0.1x and 10x
+    // Calculate how much to adjust pan based on zoom change
+    const zoomChange = zoom / oldZoom;
+    panX = centerX - (centerX - panX) * zoomChange;
+    panY = centerY - (centerY - panY) * zoomChange;
     
     updateZoomDisplay();
     updateGrid();
 }
 
 function resetZoom() {
-    zoom = 1;
-    panX = 0;
-    panY = 0;
+    if (!currentBitmap) return;
+    
+    // Calculate initial scale to fit image in canvas
+    const scaleX = editorCanvas.width / currentBitmap.width;
+    const scaleY = editorCanvas.height / currentBitmap.height;
+    zoom = Math.min(scaleX, scaleY) * 0.9; // Leave some margin
+    
+    // Center the image
+    panX = (editorCanvas.width - currentBitmap.width * zoom) / 2;
+    panY = (editorCanvas.height - currentBitmap.height * zoom) / 2;
+    
     updateZoomDisplay();
     updateGrid();
 }
@@ -578,11 +692,9 @@ function updateZoomDisplay() {
 function updatePreview() {
     if (!currentBitmap) return;
     
-    const dimensions = parseInt(dimensionsEdit.value);
+    const dimensions = parseInt(dimensionsEdit.value) || 21; // Default to 21 if invalid
     // Validate dimensions (QR codes support up to 177x177, but we'll be conservative)
-    const validDimensions = Math.max(1, Math.min(177, dimensions));
-    
-    if (validDimensions <= 0) return;
+    const validDimensions = Math.max(21, Math.min(177, dimensions));
     
     // Get filtered image data for preview
     let imageData = getFilteredImageData();
@@ -591,23 +703,66 @@ function updatePreview() {
         const tempCanvas = document.createElement("canvas");
         tempCanvas.width = currentBitmap.width;
         tempCanvas.height = currentBitmap.height;
-        const tempCtx = tempCanvas.getContext("2d");
+        const tempCtx = getOptimizedContext(tempCanvas);
         tempCtx.drawImage(currentBitmap, 0, 0);
         imageData = tempCtx.getImageData(0, 0, currentBitmap.width, currentBitmap.height);
     }
     
-    // Generate QR using perspective-correct sampling
-    const sharpener = new QRSharpener(validDimensions, parseInt(threshold.value));
-    const result = sharpener.sharpen(imageData, corners);
-    
-    // Display on preview canvas
-    const previewCtx = previewCanvas.getContext("2d");
-    const previewImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), validDimensions, validDimensions);
-    previewCanvas.width = validDimensions;
-    previewCanvas.height = validDimensions;
-    previewCtx.putImageData(previewImageData, 0, 0);
+    try {
+        // Generate QR using perspective-correct sampling
+        const sharpener = new QRSharpener(validDimensions, parseInt(threshold.value) || 128);
+        const result = sharpener.sharpen(imageData, corners);
+        
+        if (result && result.qrCodeBuffer) {
+            // Display on preview canvas
+            previewCanvas.width = validDimensions;
+            previewCanvas.height = validDimensions;
+            const previewCtx = getOptimizedContext(previewCanvas);
+            
+            // Create the preview image data
+            const buffer = new Uint8ClampedArray(validDimensions * validDimensions * 4);
+            for (let i = 0; i < result.qrCodeBuffer.length; i++) {
+                const value = result.qrCodeBuffer[i];
+                const idx = i * 4;
+                buffer[idx] = value;     // R
+                buffer[idx + 1] = value; // G
+                buffer[idx + 2] = value; // B
+                buffer[idx + 3] = 255;   // A
+            }
+            
+            const previewImageData = new ImageData(buffer, validDimensions, validDimensions);
+            previewCtx.putImageData(previewImageData, 0, 0);
+            
+            updateDecodedOutput(result.qrCodeBuffer, validDimensions, "Preview", previewImageData);
+        }
+    } catch (error) {
+        console.error('Error in updatePreview:', error);
+    }
+}
 
-    updateDecodedOutput(result.qrCodeBuffer, validDimensions, "Preview", previewImageData);
+function updateDecodedOutput(qrBuffer, dimensions, label, imageData) {
+    try {
+        // Create ImageData from the buffer
+        const qrImageData = new ImageData(Uint8ClampedArray.from(qrBuffer), dimensions, dimensions);
+        
+        // Decode using jsQR
+        const code = window.jsQR(qrImageData.data, dimensions, dimensions);
+        
+        if (code) {
+            decodedOutput.textContent = code.data;
+            decodedStatus.textContent = `${label}: Decoded successfully`;
+            decodedStatus.className = "decoded-status success";
+        } else {
+            decodedOutput.textContent = "No QR code detected";
+            decodedStatus.textContent = `${label}: Failed to decode`;
+            decodedStatus.className = "decoded-status error";
+        }
+    } catch (error) {
+        console.error("Error decoding QR:", error);
+        decodedOutput.textContent = "Error decoding";
+        decodedStatus.textContent = `${label}: Error`;
+        decodedStatus.className = "decoded-status error";
+    }
 }
 
 async function convertImage() {

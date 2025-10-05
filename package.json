@@ -1,26 +1,26 @@
 {
-  "name": "qrSharpener",
+  "name": "qr-sharpener",
   "version": "1.0.0",
   "description": "Takes a blurry shot of a QR code and tries to sharpen it",
   "scripts": {
-    "start": "parcel index.html",
-    "deploy": "parcel build -d docs --public-url . index.html",
+    "start": "parcel serve index.html",
+    "build": "parcel build index.html --dist-dir docs --public-url .",
     "test": "ts-mocha test/*.ts"
   },
   "keywords": [],
   "author": "Harald Fernengel <harryf@gmx.com>",
   "license": "ISC",
   "dependencies": {
-    "jpeg-js": "^0.3.4",
-    "jsqr": "^1.4.0"
+    "jpeg-js": "^0.4.4"
   },
   "devDependencies": {
+    "@parcel/transformer-typescript-types": "^2.9.3",
     "@types/chai": "^4.1.7",
     "@types/jpeg-js": "^0.3.0",
     "@types/mocha": "^5.2.5",
     "chai": "^4.2.0",
-    "mocha": "^5.2.0",
-    "parcel-bundler": "^1.10.3",
+    "mocha": "^11.7.4",
+    "parcel": "^2.9.3",
     "raw-loader": "^0.5.1",
     "ts-mocha": "^2.0.0",
     "ts-node": "^7.0.1",
