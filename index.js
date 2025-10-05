@@ -1,7 +1,6 @@
 import jsQR from "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.es6.min.js";
 import { QRSharpener } from "./QRSharpener.js";
 
-const annotatedImage = document.getElementById("annotatedImage");
 const resultImage = document.getElementById("resultImage");
 const croppedImage = document.getElementById("croppedImage");
 const threshold = document.getElementById("threshold");
@@ -31,6 +30,12 @@ const exportCorrected = document.getElementById("exportCorrected");
 const decodedOutput = document.getElementById("decodedOutput");
 const decodedStatus = document.getElementById("decodedStatus");
 const essentialHints = document.getElementById("essentialHints");
+const zoomLevel = document.getElementById("zoomLevel");
+const editorSection = document.getElementById("editorSection");
+const editorCanvas = document.getElementById("editorCanvas");
+const previewCanvas = document.getElementById("previewCanvas");
+const canvas = document.createElement("canvas");
+const resultCanvas = document.createElement("canvas");
 
 let currentBitmap = null;
 let corners = [];
@@ -48,8 +53,8 @@ let hoveredCorner = null; // Track which corner is being hovered
 // Correction mode variables
 let correctionMode = false;
 let originalQRBuffer = null;
-let annotatedImageData = null;
 let correctedQRBuffer = null;
+let correctionBaseImageData = null;
 
 // Debounce function for input fields
 function debounce(func, wait) {
@@ -659,8 +664,6 @@ function processFile(bitmap, dimensions, corners) {
         canvas.width = bitmap.width;
         canvas.height = bitmap.height;
         const context = canvas.getContext("2d");
-        if (context === null)
-            throw new Error("Cannot get 2d canvas context");
         context.drawImage(bitmap, 0, 0);
         return context.getImageData(0, 0, bitmap.width, bitmap.height);
     })();
@@ -728,59 +731,9 @@ function processFile(bitmap, dimensions, corners) {
     
     correctedCropCtx.putImageData(correctedImageData, 0, 0);
     croppedImage.src = correctedCropCanvas.toDataURL();
-    // Create annotated image - corrected crop with sampling dots
-    const annotatedCanvas = document.createElement("canvas");
-    annotatedCanvas.width = dimensions;
-    annotatedCanvas.height = dimensions;
-    const annotatedCtx = annotatedCanvas.getContext("2d");
-    
-    // Start with the corrected cropped image
-    annotatedCtx.putImageData(correctedImageData, 0, 0);
-    
-    // Overlay red dots at sampling positions (same as QR algorithm)
-    annotatedCtx.fillStyle = 'red';
-    for (let y = 0; y < dimensions; ++y) {
-        for (let x = 0; x < dimensions; ++x) {
-            // Calculate the same sampling position as the QR algorithm
-            const t_x = (x + 0.5) / dimensions;
-            const t_y = (y + 0.5) / dimensions;
+    correctionBaseImageData = new ImageData(new Uint8ClampedArray(correctedImageData.data), correctedImageData.width, correctedImageData.height);
 
-            // Interpolate along top and bottom edges
-            const topX = topLeft.x + t_x * (topRight.x - topLeft.x);
-            const topY = topLeft.y + t_x * (topRight.y - topLeft.y);
-            const bottomX = bottomLeft.x + t_x * (bottomRight.x - bottomLeft.x);
-            const bottomY = bottomLeft.y + t_x * (bottomRight.y - bottomLeft.y);
-
-            // Interpolate between top and bottom
-            const sampleX = topX + t_y * (bottomX - topX);
-            const sampleY = topY + t_y * (bottomY - topY);
-
-            // Draw red dot at sampling position (scaled to canvas)
-            const canvasX = (sampleX / imageData.width) * dimensions;
-            const canvasY = (sampleY / imageData.height) * dimensions;
-            
-            // Only draw if within bounds
-            if (canvasX >= 0 && canvasX < dimensions && canvasY >= 0 && canvasY < dimensions) {
-                annotatedCtx.beginPath();
-                annotatedCtx.arc(canvasX, canvasY, 1, 0, 2 * Math.PI);
-                annotatedCtx.fill();
-            }
-        }
-    }
-    
-    annotatedImage.src = annotatedCanvas.toDataURL();
-
-    const resultImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), dimensions, dimensions);
-    const annotatedImageData = new ImageData(Uint8ClampedArray.from(result.annotatedImageBuffer), imageData.width, imageData.height);
-
-    // Store data for correction mode
-    originalQRBuffer = new Uint8ClampedArray(result.qrCodeBuffer);
-    correctedQRBuffer = new Uint8ClampedArray(result.qrCodeBuffer);
-
-    // Show correction interface
-    showCorrectionInterface(dimensions, correctedImageData, resultImageData);
-
-    renderResult(resultImageData, resultImage);
+    updateDecodedOutput(result.qrCodeBuffer, dimensions, "Conversion", correctedImageData);
 }
 
 function renderResult(imageData, destination) {
@@ -790,6 +743,10 @@ function renderResult(imageData, destination) {
     const context = resultCanvas.getContext('2d');
     context.putImageData(imageData, 0, 0);
     destination.src = resultCanvas.toDataURL();
+
+    if (destination === resultImage) {
+        updateDecodedOutput(imageData.data, imageData.width, "Corrected Output", imageData);
+    }
 }
 
 function showCorrectionInterface(dimensions, annotatedData, qrData) {
@@ -807,6 +764,12 @@ function showCorrectionInterface(dimensions, annotatedData, qrData) {
 
 function updateCorrectionCanvas() {
     if (!correctionCanvas.dataset.dimensions) return;
+    if (!correctedQRBuffer) {
+        if (essentialHints) {
+            essentialHints.textContent = "Awaiting a processed QR before showing guidance.";
+        }
+        return;
+    }
     
     const ctx = correctionCanvas.getContext('2d');
     const dimensions = parseInt(correctionCanvas.dataset.dimensions);
@@ -815,58 +778,17 @@ function updateCorrectionCanvas() {
     ctx.clearRect(0, 0, correctionCanvas.width, correctionCanvas.height);
     
     // Draw corrected cropped image as background
-    const correctedCanvas = document.createElement('canvas');
-    correctedCanvas.width = dimensions;
-    correctedCanvas.height = dimensions;
-    const correctedCtx = correctedCanvas.getContext('2d');
-    
-    // Recreate the corrected image data (same logic as in processFile)
-    const correctedImageData = correctedCtx.createImageData(dimensions, dimensions);
-    const imageData = getFilteredImageData() || (() => {
-        canvas.width = currentBitmap.width;
-        canvas.height = currentBitmap.height;
-        const context = canvas.getContext("2d");
-        context.drawImage(currentBitmap, 0, 0);
-        return context.getImageData(0, 0, currentBitmap.width, currentBitmap.height);
-    })();
-    
-    const topLeft = corners[0];
-    const topRight = corners[1];
-    const bottomRight = corners[2];
-    const bottomLeft = corners[3];
-
-    for (let y = 0; y < dimensions; ++y) {
-        for (let x = 0; x < dimensions; ++x) {
-            const t_x = x / (dimensions - 1);
-            const t_y = y / (dimensions - 1);
-
-            const topX = topLeft.x + t_x * (topRight.x - topLeft.x);
-            const topY = topLeft.y + t_x * (topRight.y - topLeft.y);
-            const bottomX = bottomLeft.x + t_x * (bottomRight.x - bottomLeft.x);
-            const bottomY = bottomLeft.y + t_x * (bottomRight.y - bottomLeft.y);
-
-            const sampleX = topX + t_y * (bottomX - topX);
-            const sampleY = topY + t_y * (bottomY - topY);
-
-            const nx = Math.round(sampleX);
-            const ny = Math.round(sampleY);
-
-            const clampedNx = Math.max(0, Math.min(imageData.width - 1, nx));
-            const clampedNy = Math.max(0, Math.min(imageData.height - 1, ny));
-
-            let pixelIndex = ((clampedNy * imageData.width) + clampedNx) * 4;
-            const pixels = Array.from(imageData.data.slice(pixelIndex, pixelIndex + 4));
-
-            const targetIndex = (y * dimensions + x) * 4;
-            correctedImageData.data[targetIndex] = pixels[0];
-            correctedImageData.data[targetIndex + 1] = pixels[1];
-            correctedImageData.data[targetIndex + 2] = pixels[2];
-            correctedImageData.data[targetIndex + 3] = pixels[3];
-        }
+    if (!correctionBaseImageData) {
+        ctx.fillStyle = "#f8fafc";
+        ctx.fillRect(0, 0, correctionCanvas.width, correctionCanvas.height);
+    } else {
+        const correctedCanvas = document.createElement('canvas');
+        correctedCanvas.width = correctionBaseImageData.width;
+        correctedCanvas.height = correctionBaseImageData.height;
+        const correctedCtx = correctedCanvas.getContext('2d');
+        correctedCtx.putImageData(correctionBaseImageData, 0, 0);
+        ctx.drawImage(correctedCanvas, 0, 0, correctionBaseImageData.width, correctionBaseImageData.height, 0, 0, correctionCanvas.width, correctionCanvas.height);
     }
-    
-    correctedCtx.putImageData(correctedImageData, 0, 0);
-    ctx.drawImage(correctedCanvas, 0, 0, dimensions, dimensions, 0, 0, correctionCanvas.width, correctionCanvas.height);
     
     // Draw QR overlay with opacity
     const opacity = parseInt(overlayOpacity.value) / 100;
@@ -876,7 +798,7 @@ function updateCorrectionCanvas() {
     qrCanvas.width = dimensions;
     qrCanvas.height = dimensions;
     const qrCtx = qrCanvas.getContext('2d');
-    const qrImageData = new ImageData(correctedQRBuffer.slice(), dimensions, dimensions);
+    const qrImageData = new ImageData(new Uint8ClampedArray(correctedQRBuffer), dimensions, dimensions);
     qrCtx.putImageData(qrImageData, 0, 0);
     
     ctx.drawImage(qrCanvas, 0, 0, dimensions, dimensions, 0, 0, correctionCanvas.width, correctionCanvas.height);
@@ -904,98 +826,134 @@ function updateCorrectionCanvas() {
             ctx.stroke();
         }
     }
-}
 
-function handleCorrectionClick(e) {
-    if (!correctionMode || !correctedQRBuffer) return;
-    
-    const rect = correctionCanvas.getBoundingClientRect();
-    const dimensions = parseInt(correctionCanvas.dataset.dimensions);
-    
-    // Convert click coordinates to canvas coordinates
-    const canvasX = (e.clientX - rect.left) * (correctionCanvas.width / rect.width);
-    const canvasY = (e.clientY - rect.top) * (correctionCanvas.height / rect.height);
-    
-    // Convert to grid coordinates
-    const gridX = Math.floor((canvasX / correctionCanvas.width) * dimensions);
-    const gridY = Math.floor((canvasY / correctionCanvas.height) * dimensions);
-    
-    // Ensure coordinates are within bounds
-    if (gridX >= 0 && gridX < dimensions && gridY >= 0 && gridY < dimensions) {
-        // Toggle the pixel (black <-> white)
-        const index = (gridY * dimensions + gridX) * 4;
-        const isBlack = correctedQRBuffer[index] === 0;
-        
-        if (isBlack) {
-            // Make white
-            correctedQRBuffer[index] = 255;     // R
-            correctedQRBuffer[index + 1] = 255; // G
-            correctedQRBuffer[index + 2] = 255; // B
-            correctedQRBuffer[index + 3] = 255; // A
-        } else {
-            // Make black
-            correctedQRBuffer[index] = 0;       // R
-            correctedQRBuffer[index + 1] = 0;   // G
-            correctedQRBuffer[index + 2] = 0;   // B
-            correctedQRBuffer[index + 3] = 255; // A
-        }
-        
-        updateCorrectionCanvas();
-        updateResultImage();
+    const essentialReport = highlightEssentialModules(ctx, dimensions);
+    if (essentialHints) {
+        essentialHints.innerHTML = essentialReport.message;
     }
 }
 
-function exportCorrectedQR() {
-    if (!correctedQRBuffer) return;
-    
-    const dimensions = parseInt(correctionCanvas.dataset.dimensions);
-    const correctedImageData = new ImageData(correctedQRBuffer.slice(), dimensions, dimensions);
-    renderResult(correctedImageData, resultImage);
-    
-    // Optionally download the image
-    const link = document.createElement('a');
-    link.download = 'corrected-qr.png';
-    link.href = resultImage.src;
-    link.click();
+function highlightEssentialModules(ctx, dimensions) {
+    if (!correctedQRBuffer) {
+        return {
+            message: "Load or generate a QR to see essential guidance.",
+            issues: []
+        };
+    }
+
+    const issues = [];
+    const cellSize = correctionCanvas.width / dimensions;
+
+    const finderPattern = [
+        [1,1,1,1,1,1,1],
+        [1,0,0,0,0,0,1],
+        [1,0,1,1,1,0,1],
+        [1,0,1,1,1,0,1],
+        [1,0,1,1,1,0,1],
+        [1,0,0,0,0,0,1],
+        [1,1,1,1,1,1,1]
+    ];
+
+    const finderLocations = [
+        { name: "Top-left finder", x: 0, y: 0 },
+        { name: "Top-right finder", x: dimensions - 7, y: 0 },
+        { name: "Bottom-left finder", x: 0, y: dimensions - 7 }
+    ];
+
+    const overlayRects = [];
+
+    finderLocations.forEach(loc => {
+        for (let dy = 0; dy < 7; dy++) {
+            for (let dx = 0; dx < 7; dx++) {
+                const expected = finderPattern[dy][dx] === 1;
+                const moduleX = loc.x + dx;
+                const moduleY = loc.y + dy;
+                if (moduleX < 0 || moduleY < 0 || moduleX >= dimensions || moduleY >= dimensions) continue;
+                const actualIsBlack = isModuleBlack(correctedQRBuffer, dimensions, moduleX, moduleY);
+                if (actualIsBlack !== expected) {
+                    const issueType = expected ? "needs to be black" : "needs to be white";
+                    issues.push({
+                        area: loc.name,
+                        x: moduleX,
+                        y: moduleY,
+                        expectation: expected,
+                        message: `${loc.name}: module (${moduleX},${moduleY}) ${issueType}.`
+                    });
+                    overlayRects.push({
+                        x: moduleX,
+                        y: moduleY,
+                        expectation: expected
+                    });
+                }
+            }
+        }
+    });
+
+    // Timing patterns along row 6 and column 6 (0-indexed)
+    const timingIndex = 6;
+    const timingStart = 8;
+    const timingEnd = dimensions - 8;
+
+    for (let x = timingStart; x < timingEnd; x++) {
+        const expectedBlack = ((x + timingIndex) % 2 === 0);
+        const actualBlack = isModuleBlack(correctedQRBuffer, dimensions, x, timingIndex);
+        if (actualBlack !== expectedBlack) {
+            issues.push({
+                area: "Horizontal timing",
+                x,
+                y: timingIndex,
+                expectation: expectedBlack,
+                message: `Timing row: module (${x},${timingIndex}) should be ${expectedBlack ? "black" : "white"}.`
+            });
+            overlayRects.push({ x, y: timingIndex, expectation: expectedBlack });
+        }
+    }
+
+    for (let y = timingStart; y < timingEnd; y++) {
+        const expectedBlack = ((timingIndex + y) % 2 === 0);
+        const actualBlack = isModuleBlack(correctedQRBuffer, dimensions, timingIndex, y);
+        if (actualBlack !== expectedBlack) {
+            issues.push({
+                area: "Vertical timing",
+                x: timingIndex,
+                y,
+                expectation: expectedBlack,
+                message: `Timing column: module (${timingIndex},${y}) should be ${expectedBlack ? "black" : "white"}.`
+            });
+            overlayRects.push({ x: timingIndex, y, expectation: expectedBlack });
+        }
+    }
+
+    // Draw overlay highlights
+    ctx.save();
+    overlayRects.forEach(rect => {
+        ctx.fillStyle = rect.expectation ? "rgba(220,38,38,0.45)" : "rgba(59,130,246,0.35)";
+        ctx.fillRect(rect.x * cellSize, rect.y * cellSize, cellSize, cellSize);
+        ctx.strokeStyle = rect.expectation ? "rgba(185,28,28,0.8)" : "rgba(37,99,235,0.8)";
+        ctx.strokeRect(rect.x * cellSize + 0.5, rect.y * cellSize + 0.5, cellSize - 1, cellSize - 1);
+    });
+    ctx.restore();
+
+    let message;
+    if (issues.length === 0) {
+        message = "✅ Finder and timing patterns look solid. Focus on the data modules next.";
+    } else {
+        const grouped = issues.slice(0, 6).map(item => `• ${item.message}`).join("<br>");
+        const extra = issues.length > 6 ? `<br>…and ${issues.length - 6} more modules need attention.` : "";
+        message = `<strong>Critical fixes suggested:</strong><br>${grouped}${extra}`;
+    }
+
+    return { message, issues };
+}
+
+function isModuleBlack(buffer, dimensions, x, y) {
+    const index = (y * dimensions + x) * 4;
+    return buffer[index] < 128;
 }
 
 function updateResultImage() {
-    if (!correctedQRBuffer) return;
-    
+    if (!correctedQRBuffer || !correctionCanvas.dataset.dimensions) return;
     const dimensions = parseInt(correctionCanvas.dataset.dimensions);
-    const correctedImageData = new ImageData(correctedQRBuffer.slice(), dimensions, dimensions);
+    const correctedImageData = new ImageData(new Uint8ClampedArray(correctedQRBuffer), dimensions, dimensions);
     renderResult(correctedImageData, resultImage);
-}
-
-function updateDecodedOutput(buffer, dimension, contextLabel = "Preview", fallbackImageData = null) {
-    if (!decodedOutput || !decodedStatus || !buffer) {
-        return;
-    }
-
-    try {
-        const binaryData = new ImageData(Uint8ClampedArray.from(buffer), dimension, dimension);
-        let decoded = jsQR(binaryData.data, dimension, dimension, {
-            inversionAttempts: "attemptBoth",
-            greyScaleWeights: { r: 0.2126, g: 0.7152, b: 0.0722 },
-            canOverwriteImage: true
-        });
-
-        if (!decoded && fallbackImageData) {
-            decoded = jsQR(fallbackImageData.data, fallbackImageData.width, fallbackImageData.height, {
-                inversionAttempts: "attemptBoth",
-                greyScaleWeights: { r: 0.299, g: 0.587, b: 0.114 },
-                canOverwriteImage: false
-            });
-        }
-
-        if (decoded) {
-            decodedOutput.textContent = decoded.data || "(QR decoded but no payload)";
-            decodedStatus.textContent = `✅ Decoded from ${contextLabel}${decoded.version ? ` • Version ${decoded.version}` : ""}`;
-        } else {
-            decodedStatus.textContent = `⏳ No valid QR detected yet from ${contextLabel}. Keep refining…`;
-        }
-    } catch (err) {
-        console.warn("Decoder error", err);
-        decodedStatus.textContent = `⚠️ Decoder error (${contextLabel}): ${err.message}`;
-    }
 }
