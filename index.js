@@ -471,8 +471,8 @@ function drag(e) {
         const imageX = (canvasX - panX) / zoom;
         const imageY = (canvasY - panY) / zoom;
 
-        corners[draggedCorner].x = Math.max(0, Math.min(currentBitmap.width, imageX));
-        corners[draggedCorner].y = Math.max(0, Math.min(currentBitmap.height, imageY));
+        corners[draggedCorner].x = imageX;
+        corners[draggedCorner].y = imageY;
 
         updateGrid();
     } else if (isPanning) {
@@ -495,7 +495,7 @@ function zoomCanvas(factor) {
     const centerY = editorCanvas.height / 2;
     
     zoom *= factor;
-    zoom = Math.max(0.1, Math.min(5, zoom)); // Limit zoom between 0.1x and 5x
+    zoom = Math.max(0.1, Math.min(10, zoom)); // Limit zoom between 0.1x and 10x
     
     updateZoomDisplay();
     updateGrid();
@@ -636,36 +636,30 @@ function processFile(bitmap, dimensions, corners) {
     const minY = Math.min(...corners.map(c => c.y));
     const maxY = Math.max(...corners.map(c => c.y));
 
-    const cropWidth = Math.max(1, maxX - minX);
-    const cropHeight = Math.max(1, maxY - minY);
+    // Clamp crop region to image bounds
+    const clampedMinX = Math.max(0, minX);
+    const clampedMaxX = Math.min(displayBitmap.width, maxX);
+    const clampedMinY = Math.max(0, minY);
+    const clampedMaxY = Math.min(displayBitmap.height, maxY);
+
+    const cropWidth = Math.max(1, clampedMaxX - clampedMinX);
+    const cropHeight = Math.max(1, clampedMaxY - clampedMinY);
 
     const cropCanvas = document.createElement("canvas");
     cropCanvas.width = cropWidth;
     cropCanvas.height = cropHeight;
     const cropCtx = cropCanvas.getContext("2d");
-    cropCtx.drawImage(displayBitmap, minX, minY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+    cropCtx.drawImage(displayBitmap, clampedMinX, clampedMinY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
     croppedImage.src = cropCanvas.toDataURL();
+    // Create annotated image - show the full image with sampling dots
     const annotatedCanvas = document.createElement("canvas");
-    annotatedCanvas.width = cropWidth;
-    annotatedCanvas.height = cropHeight;
+    annotatedCanvas.width = imageData.width;
+    annotatedCanvas.height = imageData.height;
     const annotatedCtx = annotatedCanvas.getContext("2d");
-    
-    // Extract the cropped portion from the annotated image buffer
-    const croppedAnnotatedData = annotatedCtx.createImageData(cropWidth, cropHeight);
-    for (let y = 0; y < cropHeight; y++) {
-        for (let x = 0; x < cropWidth; x++) {
-            const sourceIndex = ((minY + y) * imageData.width + (minX + x)) * 4;
-            const targetIndex = (y * cropWidth + x) * 4;
-            
-            // Copy RGBA values from the annotated buffer (includes original image + red dots)
-            croppedAnnotatedData.data[targetIndex] = result.annotatedImageBuffer[sourceIndex];     // R
-            croppedAnnotatedData.data[targetIndex + 1] = result.annotatedImageBuffer[sourceIndex + 1]; // G  
-            croppedAnnotatedData.data[targetIndex + 2] = result.annotatedImageBuffer[sourceIndex + 2]; // B
-            croppedAnnotatedData.data[targetIndex + 3] = result.annotatedImageBuffer[sourceIndex + 3]; // A
-        }
-    }
-    
-    annotatedCtx.putImageData(croppedAnnotatedData, 0, 0);
+
+    // Create image data from the full annotated buffer
+    const fullAnnotatedData = new ImageData(Uint8ClampedArray.from(result.annotatedImageBuffer), imageData.width, imageData.height);
+    annotatedCtx.putImageData(fullAnnotatedData, 0, 0);
     annotatedImage.src = annotatedCanvas.toDataURL();
 
     const resultImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), dimensions, dimensions);
