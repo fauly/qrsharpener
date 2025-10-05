@@ -581,7 +581,7 @@ function updatePreview() {
     if (validDimensions <= 0) return;
     
     // Get filtered image data for preview
-    const imageData = getFilteredImageData();
+    let imageData = getFilteredImageData();
     if (!imageData) {
         // Fallback to original bitmap if filtering fails
         const tempCanvas = document.createElement("canvas");
@@ -602,6 +602,8 @@ function updatePreview() {
     previewCanvas.width = validDimensions;
     previewCanvas.height = validDimensions;
     previewCtx.putImageData(previewImageData, 0, 0);
+
+    updateDecodedOutput(result.qrCodeBuffer, validDimensions, "Preview", previewImageData);
 }
 
 async function convertImage() {
@@ -634,7 +636,7 @@ async function convertImage() {
 
 async function cropToRectangle(bitmap, corners) {
     const minX = Math.min(...corners.map(c => c.x));
-    const maxX = Math.max(...corners.map c => c.x));
+    const maxX = Math.max(...corners.map(c => c.x));
     const minY = Math.min(...corners.map(c => c.y));
     const maxY = Math.max(...corners.map(c => c.y));
 
