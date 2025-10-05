@@ -5,6 +5,15 @@ const resultImage = document.getElementById("resultImage");
 const croppedImage = document.getElementById("croppedImage");
 const threshold = document.getElementById("threshold");
 const thresholdValue = document.getElementById("thresholdValue");
+const brightness = document.getElementById("brightness");
+const brightnessValue = document.getElementById("brightnessValue");
+const contrast = document.getElementById("contrast");
+const contrastValue = document.getElementById("contrastValue");
+const saturation = document.getElementById("saturation");
+const saturationValue = document.getElementById("saturationValue");
+const sharpness = document.getElementById("sharpness");
+const sharpnessValue = document.getElementById("sharpnessValue");
+const resetFilters = document.getElementById("resetFilters");
 const uploader = document.getElementById("uploader");
 const convertBtn = document.getElementById("convertBtn");
 const statusDiv = document.getElementById("status");
@@ -49,14 +58,63 @@ function updateThresholdDisplay() {
     thresholdValue.textContent = threshold.value;
 }
 
-// Initialize threshold display
+function updateFilterDisplay() {
+    brightnessValue.textContent = brightness.value;
+    contrastValue.textContent = contrast.value;
+    saturationValue.textContent = saturation.value;
+    sharpnessValue.textContent = sharpness.value;
+}
+
+function applyFilters() {
+    const brightnessVal = brightness.value / 100;
+    const contrastVal = contrast.value / 100;
+    const saturationVal = saturation.value / 100;
+    const sharpnessVal = sharpness.value / 100;
+    
+    // Apply CSS filters to the editor canvas
+    let filterString = `brightness(${brightnessVal}) contrast(${contrastVal}) saturate(${saturationVal})`;
+    
+    // Add sharpness effect using a combination of contrast and brightness
+    if (sharpnessVal > 0) {
+        // Simple sharpness approximation using contrast boost
+        const sharpnessContrast = 1 + (sharpnessVal * 0.5);
+        filterString += ` contrast(${sharpnessContrast})`;
+    }
+    
+    editorCanvas.style.filter = filterString;
+    
+    // Update the grid and preview with filtered image
+    updateGrid();
+}
+
+function resetAllFilters() {
+    brightness.value = 100;
+    contrast.value = 100;
+    saturation.value = 100;
+    sharpness.value = 0;
+    
+    updateFilterDisplay();
+    applyFilters();
+}
+
+// Initialize displays
 updateThresholdDisplay();
+updateFilterDisplay();
 
 uploader.addEventListener("change", fileUploaded, false);
 convertBtn.addEventListener("click", convertImage, false);
 dimensionsEdit.addEventListener("input", debounce(updateGrid, 150), false);
 threshold.addEventListener("input", updateThresholdDisplay, false);
 threshold.addEventListener("input", debounce(updateGrid, 150), false);
+brightness.addEventListener("input", updateFilterDisplay, false);
+brightness.addEventListener("input", applyFilters, false);
+contrast.addEventListener("input", updateFilterDisplay, false);
+contrast.addEventListener("input", applyFilters, false);
+saturation.addEventListener("input", updateFilterDisplay, false);
+saturation.addEventListener("input", applyFilters, false);
+sharpness.addEventListener("input", updateFilterDisplay, false);
+sharpness.addEventListener("input", applyFilters, false);
+resetFilters.addEventListener("click", resetAllFilters, false);
 zoomInBtn.addEventListener("click", () => zoomCanvas(1.2));
 zoomOutBtn.addEventListener("click", () => zoomCanvas(0.8));
 resetZoomBtn.addEventListener("click", resetZoom);
@@ -538,10 +596,33 @@ function processFile(bitmap, dimensions, corners) {
     cropCtx.drawImage(bitmap, minX, minY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
     croppedImage.src = cropCanvas.toDataURL();
 
+    // Create annotated image from the cropped portion of the annotated buffer
+    const annotatedCanvas = document.createElement("canvas");
+    annotatedCanvas.width = cropWidth;
+    annotatedCanvas.height = cropHeight;
+    const annotatedCtx = annotatedCanvas.getContext("2d");
+    
+    // Extract the cropped portion from the annotated image buffer
+    const croppedAnnotatedData = annotatedCtx.createImageData(cropWidth, cropHeight);
+    for (let y = 0; y < cropHeight; y++) {
+        for (let x = 0; x < cropWidth; x++) {
+            const sourceIndex = ((minY + y) * bitmap.width + (minX + x)) * 4;
+            const targetIndex = (y * cropWidth + x) * 4;
+            
+            // Copy RGBA values from the annotated buffer (includes original image + red dots)
+            croppedAnnotatedData.data[targetIndex] = result.annotatedImageBuffer[sourceIndex];     // R
+            croppedAnnotatedData.data[targetIndex + 1] = result.annotatedImageBuffer[sourceIndex + 1]; // G  
+            croppedAnnotatedData.data[targetIndex + 2] = result.annotatedImageBuffer[sourceIndex + 2]; // B
+            croppedAnnotatedData.data[targetIndex + 3] = result.annotatedImageBuffer[sourceIndex + 3]; // A
+        }
+    }
+    
+    annotatedCtx.putImageData(croppedAnnotatedData, 0, 0);
+    annotatedImage.src = annotatedCanvas.toDataURL();
+
     const resultImageData = new ImageData(Uint8ClampedArray.from(result.qrCodeBuffer), dimensions, dimensions);
     const annotatedImageData = new ImageData(Uint8ClampedArray.from(result.annotatedImageBuffer), bitmap.width, bitmap.height);
 
-    renderResult(annotatedImageData, annotatedImage);
     renderResult(resultImageData, resultImage);
 }
 
