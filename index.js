@@ -516,11 +516,13 @@ function startDrag(e) {
 }
 
 function drag(e) {
+    if (!currentBitmap) return;
+
+    const rect = editorCanvas.getBoundingClientRect();
+    const scaleX = editorCanvas.width / rect.width;
+    const scaleY = editorCanvas.height / rect.height;
+
     if (draggedCorner !== null) {
-        const rect = editorCanvas.getBoundingClientRect();
-        // Scale mouse coordinates to match internal canvas coordinate system
-        const scaleX = editorCanvas.width / rect.width;
-        const scaleY = editorCanvas.height / rect.height;
         const canvasX = (e.clientX - rect.left) * scaleX;
         const canvasY = (e.clientY - rect.top) * scaleY;
         
@@ -536,9 +538,6 @@ function drag(e) {
         // Pan the view
         const deltaX = e.clientX - lastPanX;
         const deltaY = e.clientY - lastPanY;
-        // Scale deltas to match internal canvas coordinate system
-        const scaleX = editorCanvas.width / rect.width;
-        const scaleY = editorCanvas.height / rect.height;
         panX += deltaX * scaleX;
         panY += deltaY * scaleY;
         lastPanX = e.clientX;
